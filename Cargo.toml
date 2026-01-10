@@ -4,6 +4,8 @@ name = "shrinky-rs"
 version = "0.0.1"
 edition = "2024"
 repository = "https://github.com/yaleman/shrinky-rs"
+description = "Rusty image converter and compressor"
+license = "MIT"
 
 [dependencies]
 clap = { version = "4.5.54", features = ["derive", "env"] }
