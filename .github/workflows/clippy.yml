@@ -24,7 +24,7 @@ jobs:
         with:
           components: clippy
       - name: Install dependencies
-        run: apt update && apt-get -y install libheif-dev libdav1d-dev
+        run: sudo apt update && sudo apt-get -y install libheif-dev libdav1d-dev
       - name: "Run clippy"
         run: cargo clippy --all-targets
       - name: Run sccache stat for check
