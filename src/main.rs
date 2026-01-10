@@ -1,12 +1,82 @@
+use std::io::{self, Write};
+use std::path::Path;
 use std::str::FromStr;
 
 use clap::Parser;
 
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use shrinky_rs::{
+    ImageFormat,
     cli::Cli,
     imagedata::{Geometry, Image},
 };
+
+/// Format a byte count as a string with comma separators
+fn format_bytes(bytes: u64) -> String {
+    let s = bytes.to_string();
+    let mut result = String::new();
+
+    for (count, c) in s.chars().rev().enumerate() {
+        if count > 0 && count % 3 == 0 {
+            result.insert(0, ',');
+        }
+        result.insert(0, c);
+    }
+
+    result
+}
+
+/// Prompt user to delete source file, showing comparison information
+fn prompt_delete_source(
+    input_path: &Path,
+    original_size: u64,
+    original_format: ImageFormat,
+    output_path: &Path,
+    output_size: usize,
+    output_format: ImageFormat,
+) -> Result<bool, io::Error> {
+    println!();
+    println!(
+        "Original: {} ({}, {} bytes)",
+        input_path.display(),
+        original_format.extension().to_uppercase(),
+        format_bytes(original_size)
+    );
+    println!(
+        "New:      {} ({}, {} bytes)",
+        output_path.display(),
+        output_format.extension().to_uppercase(),
+        format_bytes(output_size as u64)
+    );
+
+    if output_size < original_size as usize {
+        let savings = original_size - output_size as u64;
+        let percent = (savings as f64 / original_size as f64) * 100.0;
+        println!(
+            "Savings:  {} bytes ({:.0}% smaller)",
+            format_bytes(savings),
+            percent
+        );
+    } else if output_size > original_size as usize {
+        let increase = output_size as u64 - original_size;
+        let percent = (increase as f64 / original_size as f64) * 100.0;
+        println!(
+            "Increase: {} bytes ({:.0}% larger)",
+            format_bytes(increase),
+            percent
+        );
+    }
+
+    println!();
+    print!("Delete original file? [y/N]: ");
+    io::stdout().flush()?;
+
+    let mut response = String::new();
+    io::stdin().read_line(&mut response)?;
+
+    let response = response.trim().to_lowercase();
+    Ok(matches!(response.as_str(), "y" | "yes"))
+}
 
 fn main() {
     let cli = Cli::parse();
@@ -130,6 +200,83 @@ fn main() {
                 e
             );
             std::process::exit(1);
+        }
+    }
+
+    // Handle --delete flag: prompt user to delete source file if beneficial
+    if cli.delete {
+        // Don't delete if output overwrote input (file already replaced)
+        if !image.will_overwrite() {
+            // Get original format to compare
+            match ImageFormat::try_from(&image.input_filename) {
+                Ok(original_format) => {
+                    // Output format should always be set at this point
+                    if let Some(output_format) = &image.output_format {
+                        let format_changed = &original_format != output_format;
+                        let size_reduced = bytes_to_write.len() < image.original_file_size as usize;
+
+                        debug!(
+                            "Delete check: format_changed={}, size_reduced={}",
+                            format_changed, size_reduced
+                        );
+
+                        // Only prompt if there's a benefit (smaller or different format)
+                        if format_changed || size_reduced {
+                            match prompt_delete_source(
+                                &image.input_filename,
+                                image.original_file_size,
+                                original_format,
+                                &image.output_filename(),
+                                bytes_to_write.len(),
+                                *output_format,
+                            ) {
+                                Ok(should_delete) => {
+                                    if should_delete {
+                                        match std::fs::remove_file(&image.input_filename) {
+                                            Ok(_) => {
+                                                info!(
+                                                    "Deleted original file: {}",
+                                                    image.input_filename.display()
+                                                );
+                                            }
+                                            Err(e) => {
+                                                error!(
+                                                    "Failed to delete original file {}: {}",
+                                                    image.input_filename.display(),
+                                                    e
+                                                );
+                                            }
+                                        }
+                                    } else {
+                                        info!(
+                                            "Keeping original file: {}",
+                                            image.input_filename.display()
+                                        );
+                                    }
+                                }
+                                Err(e) => {
+                                    warn!("Error prompting for deletion: {}", e);
+                                }
+                            }
+                        } else {
+                            debug!(
+                                "No benefit to deleting original file (same format and not smaller)"
+                            );
+                        }
+                    } else {
+                        warn!("Output format not set after conversion");
+                    }
+                }
+                Err(e) => {
+                    warn!(
+                        "Could not determine original format for {}: {:?}",
+                        image.input_filename.display(),
+                        e
+                    );
+                }
+            }
+        } else {
+            debug!("Skipping deletion: output overwrote input file");
         }
     }
 }
