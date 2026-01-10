@@ -23,10 +23,8 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: clippy
-      # - name: Install dependencies
-      #   run: sudo apt update && sudo apt-get -y install libheif-dev libdav1d-dev libheif1 librust-libheif-rs-dev librust-libheif-sys-dev
-      # - name: find libheif
-      #   run: find / -name libheif.pc 2>/dev/null
+      - name: Install dependencies
+        run: brew install dav1d libheif
       - name: "Run clippy"
         run: cargo clippy --all-targets
       - name: Run sccache stat for check
