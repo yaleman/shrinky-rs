@@ -1,0 +1,21 @@
+[package]
+authors = ["James Hodgkinson <james@terminaloutcomes.com>"]
+name = "shrinky-rs"
+version = "0.0.1"
+edition = "2024"
+repository = "https://github.com/yaleman/shrinky-rs"
+
+[dependencies]
+clap = { version = "4.5.54", features = ["derive", "env"] }
+image = { version = "0.25.9", features = ["rayon", "avif-native"] }
+libheif-rs = { version = "2.5.2", features = ["image"] }
+log = { version = "0.4.29", features = [
+    "release_max_level_debug",
+    "max_level_debug",
+] }
+rayon = "1.11.0"
+stderrlog = "0.6.0"
+strum = { version = "0.27.2", features = ["derive", "strum_macros"] }
+
+[dev-dependencies]
+rayon = "1.11.0"
