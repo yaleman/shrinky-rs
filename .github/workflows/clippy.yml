@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   clippy:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v6
       - name: Setup sccache
@@ -23,10 +23,10 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: clippy
-      - name: Install dependencies
-        run: sudo apt update && sudo apt-get -y install libheif-dev libdav1d-dev libheif1 librust-libheif-rs-dev librust-libheif-sys-dev
-      - name: find libheif
-        run: find / -name libheif.pc 2>/dev/null
+      # - name: Install dependencies
+      #   run: sudo apt update && sudo apt-get -y install libheif-dev libdav1d-dev libheif1 librust-libheif-rs-dev librust-libheif-sys-dev
+      # - name: find libheif
+      #   run: find / -name libheif.pc 2>/dev/null
       - name: "Run clippy"
         run: cargo clippy --all-targets
       - name: Run sccache stat for check
