@@ -80,6 +80,9 @@ impl FromStr for ImageFormat {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.contains('.') {
+            return ImageFormat::try_from_filename(s);
+        }
         match s.to_lowercase().as_str() {
             "jpg" | "jpeg" => Ok(ImageFormat::Jpg),
             "png" => Ok(ImageFormat::Png),
