@@ -1,7 +1,7 @@
 [package]
 authors = ["James Hodgkinson <james@terminaloutcomes.com>"]
 name = "shrinky-rs"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2024"
 repository = "https://github.com/yaleman/shrinky-rs"
 description = "Rusty image converter and compressor"
