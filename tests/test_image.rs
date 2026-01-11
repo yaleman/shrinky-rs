@@ -52,7 +52,7 @@ fn test_loading_multiple() {
 }
 
 #[test]
-fn test_loading_png() {
+fn test_with_png() {
     let img_path = std::path::PathBuf::from(format!(
         "tests/test_images/{}.{}",
         IMAGE_NAME,
@@ -104,6 +104,16 @@ fn test_loading_png() {
         img.final_geometry() == Geometry::new(400, 400),
         "Image should be resized to 400x400"
     );
+
+    // exercise the output as format functionality
+    for fmt in [ImageFormat::Jpg, ImageFormat::Heic] {
+        let my_img = img.clone().with_output_format(fmt);
+        assert!(
+            my_img.output_as_format(fmt).is_ok(),
+            "Image should output as format {}",
+            fmt.extension()
+        );
+    }
 }
 
 #[test]
