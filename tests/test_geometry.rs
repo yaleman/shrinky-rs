@@ -38,6 +38,11 @@ fn test_geometry() {
 
     let empty_geometry = Geometry::empty();
     assert!(empty_geometry.is_empty(), "Expected geometry to be empty");
+    assert_eq!(
+        format!("{}", empty_geometry),
+        "empty".to_string(),
+        "Expected string representation to be empty"
+    );
 
     assert!(
         Geometry::from_str("800x1234x12345").is_err(),

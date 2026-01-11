@@ -214,7 +214,7 @@ impl Image {
         }
     }
 
-    pub fn resize(&mut self) -> Result<DynamicImage, Error> {
+    pub fn resize(&self) -> Result<DynamicImage, Error> {
         let final_geometry = self.final_geometry();
         if final_geometry != Geometry::new(self.image.width(), self.image.height()) {
             debug!(
@@ -238,7 +238,7 @@ impl Image {
     fn output_heif(&self) -> Result<Vec<u8>, Error> {
         let lib_heif = LibHeif::new();
         let mut context = HeifContext::new()?;
-        let mut encoder = lib_heif.encoder_for_format(CompressionFormat::Av1)?;
+        let mut encoder = lib_heif.encoder_for_format(CompressionFormat::Hevc)?;
         let Geometry { width, height } = self.final_geometry();
 
         let width = width.ok_or_else(|| {
@@ -256,37 +256,50 @@ impl Image {
         image.create_plane(Channel::R, width, height, 8)?;
         image.create_plane(Channel::G, width, height, 8)?;
         image.create_plane(Channel::B, width, height, 8)?;
+        image.create_plane(Channel::Alpha, width, height, 8)?;
 
         let planes = image.planes_mut();
-        let Some(plane_r) = planes.r else {
+
+        let (Some(plane_r), Some(plane_g), Some(plane_b), Some(plane_a)) =
+            (planes.r, planes.g, planes.b, planes.a)
+        else {
             return Err(Error::ImageEncodingError(
-                "Failed to get R plane for HEIF image".to_string(),
+                "Failed to get one of the planes for HEIF image, this is definitely a bug in the code!".to_string(),
             ));
         };
-        let stride = plane_r.stride;
 
-        let data_r = plane_r.data;
-        let (Some(plane_g), Some(plane_b)) = (planes.g, planes.b) else {
-            return Err(Error::ImageEncodingError(
-                "Failed to get G or B plane for HEIF image".to_string(),
-            ));
-        };
-        let data_g = plane_g.data;
-        let data_b = plane_b.data;
+        let stride = plane_r.stride as u32;
+        debug!(
+            "HEIF encoding image with width {}, height {}, stride {}",
+            width, height, stride
+        );
 
-        // Fill data of planes by some "pixels"
-        for y in 0..height {
-            let mut pixel_index = stride * y as usize;
-            for x in 0..width {
-                let color = (x * y).to_le_bytes();
-                data_r[pixel_index] = color[0];
-                data_g[pixel_index] = color[1];
-                data_b[pixel_index] = color[2];
-                pixel_index += 1;
-            }
-        }
+        let resized_image = self.resize()?;
+        let rgb8 = resized_image.into_rgba8();
+        rgb8.enumerate_pixels().for_each(|(x, y, pixel)| {
+            let offset = (y * stride + x) as usize;
+            pixel
+                .0
+                .iter()
+                .enumerate()
+                .for_each(|(i, &channel)| match i {
+                    0 => {
+                        plane_r.data[offset] = channel;
+                    }
+                    1 => {
+                        plane_g.data[offset] = channel;
+                    }
+                    2 => {
+                        plane_b.data[offset] = channel;
+                    }
+                    3 => {
+                        plane_a.data[offset] = channel;
+                    }
+                    _ => {}
+                });
+        });
 
-        encoder.set_quality(EncoderQuality::LossLess)?;
+        encoder.set_quality(EncoderQuality::Lossy(85))?;
         context.encode_image(&image, &mut encoder, None)?;
         context.write_to_bytes().map_err(Error::from)
     }
@@ -294,8 +307,9 @@ impl Image {
     pub fn output_as_format(&self, format: ImageFormat) -> Result<Vec<u8>, Error> {
         let write_format: Result<image::ImageFormat, Error> = format.try_into();
         if let Ok(write_format) = write_format {
+            let resized_image = self.resize()?;
             let mut buffer: Vec<u8> = Vec::new();
-            self.image
+            resized_image
                 .write_to(&mut Cursor::new(&mut buffer), write_format)
                 .map_err(|e| Error::ImageEncodingError(e.to_string()))?;
             Ok(buffer)

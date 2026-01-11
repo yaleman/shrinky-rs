@@ -6,4 +6,5 @@ Initial release
 
 ## 0.0.2
 
-Actually implementing file delete support.
+- Actually implementing file delete support.
+- Fixing HEIC/HEIF output, because it was very broken.
