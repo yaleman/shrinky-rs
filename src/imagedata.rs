@@ -214,7 +214,7 @@ impl Image {
         }
     }
 
-    pub fn resize(&mut self) -> Result<DynamicImage, Error> {
+    pub fn resize(&self) -> Result<DynamicImage, Error> {
         let final_geometry = self.final_geometry();
         if final_geometry != Geometry::new(self.image.width(), self.image.height()) {
             debug!(
@@ -274,7 +274,8 @@ impl Image {
             width, height, stride
         );
 
-        let rgb8 = self.image.clone().into_rgba8();
+        let resized_image = self.resize()?;
+        let rgb8 = resized_image.into_rgba8();
         rgb8.enumerate_pixels().for_each(|(x, y, pixel)| {
             let offset = (y * stride + x) as usize;
             pixel
@@ -306,8 +307,9 @@ impl Image {
     pub fn output_as_format(&self, format: ImageFormat) -> Result<Vec<u8>, Error> {
         let write_format: Result<image::ImageFormat, Error> = format.try_into();
         if let Ok(write_format) = write_format {
+            let resized_image = self.resize()?;
             let mut buffer: Vec<u8> = Vec::new();
-            self.image
+            resized_image
                 .write_to(&mut Cursor::new(&mut buffer), write_format)
                 .map_err(|e| Error::ImageEncodingError(e.to_string()))?;
             Ok(buffer)
