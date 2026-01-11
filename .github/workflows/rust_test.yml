@@ -23,6 +23,8 @@ jobs:
       - uses: extractions/setup-just@v3
 
       - name: "Run cargo test with coverage"
+        env:
+          COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
         run: |
           cargo install cargo-tarpaulin
           just coveralls
