@@ -258,35 +258,66 @@ impl Image {
         image.create_plane(Channel::B, width, height, 8)?;
 
         let planes = image.planes_mut();
-        let Some(plane_r) = planes.r else {
+
+        let (Some(plane_r), Some(plane_g), Some(plane_b)) = (planes.r, planes.g, planes.b) else {
             return Err(Error::ImageEncodingError(
-                "Failed to get R plane for HEIF image".to_string(),
+                "Failed to get one of the planes for HEIF image, this is definitely a bug in the code!".to_string(),
             ));
         };
-        let stride = plane_r.stride;
 
-        let data_r = plane_r.data;
-        let (Some(plane_g), Some(plane_b)) = (planes.g, planes.b) else {
+        if let Some(pixels) = self.image.as_rgba8() {
+            debug!("handling rgb8 image with alpha channel for heif encoding");
+            pixels
+                .pixels()
+                .enumerate()
+                .for_each(|(pixel_index, pixel)| {
+                    pixel
+                        .0
+                        .iter()
+                        .enumerate()
+                        .for_each(|(i, &channel)| match i {
+                            0 => {
+                                plane_r.data[pixel_index] = channel;
+                            }
+                            1 => {
+                                plane_g.data[pixel_index] = channel;
+                            }
+                            2 => {
+                                plane_b.data[pixel_index] = channel;
+                            }
+                            _ => {}
+                        });
+                });
+        } else if let Some(pixels) = self.image.as_rgb8() {
+            debug!("handling rgb8 image without alpha channel for heif encoding");
+            pixels
+                .pixels()
+                .enumerate()
+                .for_each(|(pixel_index, pixel)| {
+                    pixel
+                        .0
+                        .iter()
+                        .enumerate()
+                        .for_each(|(i, &channel)| match i {
+                            0 => {
+                                plane_r.data[pixel_index] = channel;
+                            }
+                            1 => {
+                                plane_g.data[pixel_index] = channel;
+                            }
+                            2 => {
+                                plane_b.data[pixel_index] = channel;
+                            }
+                            _ => {}
+                        });
+                });
+        } else {
             return Err(Error::ImageEncodingError(
-                "Failed to get G or B plane for HEIF image".to_string(),
+                "Failed to get RGB8-ish data from image for HEIF encoding".to_string(),
             ));
-        };
-        let data_g = plane_g.data;
-        let data_b = plane_b.data;
-
-        // Fill data of planes by some "pixels"
-        for y in 0..height {
-            let mut pixel_index = stride * y as usize;
-            for x in 0..width {
-                let color = (x * y).to_le_bytes();
-                data_r[pixel_index] = color[0];
-                data_g[pixel_index] = color[1];
-                data_b[pixel_index] = color[2];
-                pixel_index += 1;
-            }
         }
 
-        encoder.set_quality(EncoderQuality::LossLess)?;
+        encoder.set_quality(EncoderQuality::Lossy(85))?;
         context.encode_image(&image, &mut encoder, None)?;
         context.write_to_bytes().map_err(Error::from)
     }
