@@ -20,10 +20,12 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
       - name: Install dependencies
         run: brew install dav1d libheif
+      - uses: extractions/setup-just@v3
+
       - name: "Run cargo test with coverage"
         run: |
           cargo install cargo-tarpaulin
-          cargo tarpaulin --workspace --all-features --coveralls ${{ secrets.COVERALLS_REPO_TOKEN }}
+          just coveralls
         if: github.actor != 'dependabot[bot]'
       - name: "Run cargo test without coverage"
         run: |
