@@ -52,10 +52,29 @@ fn test_imageformat() {
     assert!(ImageFormat::Jpg.is_native_image_format());
     assert!(!ImageFormat::Avif.is_native_image_format());
 
-    let test_format: image::ImageFormat = ImageFormat::Png
-        .try_into()
-        .expect("Failed to convert to image::ImageFormat");
-    assert_eq!(test_format, image::ImageFormat::Png);
+    for (fmt, expected_result) in [
+        (ImageFormat::Jpg, true),
+        (ImageFormat::Png, true),
+        (ImageFormat::Webp, true),
+        (ImageFormat::Avif, true),
+        (ImageFormat::Heic, false),
+        (ImageFormat::Heif, false),
+    ] {
+        let test_format: Result<image::ImageFormat, shrinky_rs::Error> = fmt.try_into();
+        if expected_result {
+            assert!(
+                test_format.is_ok(),
+                "Expected Ok converting supported format {:?}",
+                fmt
+            );
+        } else {
+            assert!(
+                test_format.is_err(),
+                "Expected Err converting unsupported format {:?}",
+                fmt
+            );
+        }
+    }
 
     let test_format: Result<image::ImageFormat, shrinky_rs::Error> = ImageFormat::Heic.try_into();
     test_format.expect_err("Expected error converting unsupported format");
@@ -64,7 +83,7 @@ fn test_imageformat() {
 #[test]
 fn test_error() {
     let error = HeifError::from_heif_error(libheif_sys::heif_error {
-        code: 5u32.into(),
+        code: 5u32,
         subcode: 42,
         message: std::ffi::CString::new("Test error message")
             .unwrap()

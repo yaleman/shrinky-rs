@@ -1,6 +1,6 @@
 //! Image handling magic
 
-use std::{io::Cursor, path::PathBuf, str::FromStr};
+use std::{fmt::Display, io::Cursor, path::PathBuf, str::FromStr};
 
 use image::DynamicImage;
 use libheif_rs::{Channel, CompressionFormat, EncoderQuality, HeifContext, LibHeif};
@@ -16,6 +16,13 @@ pub struct Geometry {
 }
 
 impl Geometry {
+    pub fn empty() -> Self {
+        Geometry {
+            width: None,
+            height: None,
+        }
+    }
+
     pub fn is_empty(&self) -> bool {
         self.width.is_none() && self.height.is_none()
     }
@@ -28,6 +35,17 @@ impl Geometry {
     }
 }
 
+impl Display for Geometry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match (self.width, self.height) {
+            (Some(w), Some(h)) => write!(f, "{}x{}", w, h),
+            (Some(w), None) => write!(f, "{}x", w),
+            (None, Some(h)) => write!(f, "x{}", h),
+            (None, None) => write!(f, "empty"),
+        }
+    }
+}
+
 impl FromStr for Geometry {
     type Err = Error;
 
@@ -36,27 +54,35 @@ impl FromStr for Geometry {
 
         debug!("Parsing geometry from string: {}", s);
 
-        let (width, height) = if s.starts_with('x') {
-            s.strip_prefix('x')
-                .and_then(|h| h.parse::<u32>().ok())
-                .map(|h| (None, Some(h)))
-                .unwrap_or((None, None))
-        } else if s.ends_with('x') {
-            s.strip_suffix('x')
-                .and_then(|w| w.parse::<u32>().ok())
-                .map(|w| (Some(w), None))
-                .unwrap_or((None, None))
+        let (width, height) = if let Some(height_string) = s.strip_prefix('x') {
+            (
+                None,
+                Some(
+                    height_string
+                        .parse::<u32>()
+                        .map_err(|_| Error::InvalidGeometry(s.to_string()))?,
+                ),
+            )
+        } else if let Some(width_string) = s.strip_suffix('x') {
+            (
+                Some(
+                    width_string
+                        .parse::<u32>()
+                        .map_err(|_| Error::InvalidGeometry(s.to_string()))?,
+                ),
+                None,
+            )
         } else if s.contains('x') {
             let parts = s.split('x').collect::<Vec<&str>>();
             if parts.len() != 2 {
-                return Err(Error::InvalidGeometry(s.to_string()));
+                return Err(Error::InvalidGeometry("Too many x characters".to_string()));
             }
             let width = parts[0]
                 .parse::<u32>()
-                .map_err(|_| Error::InvalidGeometry(s.to_string()))?;
+                .map_err(|_| Error::InvalidGeometry(format!("Invalid width from {s}")))?;
             let height = parts[1]
                 .parse::<u32>()
-                .map_err(|_| Error::InvalidGeometry(s.to_string()))?;
+                .map_err(|_| Error::InvalidGeometry(format!("Invalid height from {s}")))?;
             (Some(width), Some(height))
         } else {
             return Err(Error::InvalidGeometry(s.to_string()));
@@ -212,6 +238,56 @@ impl Image {
         }
     }
 
+    /// build and return HEIF/HEIC image data
+    fn output_heif(&self) -> Result<Vec<u8>, Error> {
+        let lib_heif = LibHeif::new();
+        let mut context = HeifContext::new()?;
+        let mut encoder = lib_heif.encoder_for_format(CompressionFormat::Av1)?;
+        let (width, height) = self.final_geometry();
+
+        let mut image = libheif_rs::Image::new(
+            width,
+            height,
+            libheif_rs::ColorSpace::Rgb(libheif_rs::RgbChroma::C444),
+        )?;
+        image.create_plane(Channel::R, width, height, 8)?;
+        image.create_plane(Channel::G, width, height, 8)?;
+        image.create_plane(Channel::B, width, height, 8)?;
+
+        let planes = image.planes_mut();
+        let Some(plane_r) = planes.r else {
+            return Err(Error::ImageEncodingError(
+                "Failed to get R plane for HEIF image".to_string(),
+            ));
+        };
+        let stride = plane_r.stride;
+
+        let data_r = plane_r.data;
+        let (Some(plane_g), Some(plane_b)) = (planes.g, planes.b) else {
+            return Err(Error::ImageEncodingError(
+                "Failed to get G or B plane for HEIF image".to_string(),
+            ));
+        };
+        let data_g = plane_g.data;
+        let data_b = plane_b.data;
+
+        // Fill data of planes by some "pixels"
+        for y in 0..height {
+            let mut pixel_index = stride * y as usize;
+            for x in 0..width {
+                let color = (x * y).to_le_bytes();
+                data_r[pixel_index] = color[0];
+                data_g[pixel_index] = color[1];
+                data_b[pixel_index] = color[2];
+                pixel_index += 1;
+            }
+        }
+
+        encoder.set_quality(EncoderQuality::LossLess)?;
+        context.encode_image(&image, &mut encoder, None)?;
+        context.write_to_bytes().map_err(Error::from)
+    }
+
     pub fn output_as_format(&self, format: ImageFormat) -> Result<Vec<u8>, Error> {
         let write_format: Result<image::ImageFormat, Error> = format.try_into();
         if let Ok(write_format) = write_format {
@@ -219,62 +295,14 @@ impl Image {
             self.image
                 .write_to(&mut Cursor::new(&mut buffer), write_format)
                 .map_err(|e| Error::ImageEncodingError(e.to_string()))?;
-            Ok(buffer.into_iter().collect::<Vec<u8>>())
+            Ok(buffer)
         } else {
             if format.is_native_image_format() {
                 return Err(Error::ImageEncodingError(
                     "Failed to convert to native image format".to_string(),
                 ));
             }
-            // Handle non-native formats (e.g., AVIF, HEIC, HEIF) here
-            // Encode image and save it into file.
-            let lib_heif = LibHeif::new();
-            let mut context = HeifContext::new()?;
-            let mut encoder = lib_heif.encoder_for_format(CompressionFormat::Av1)?;
-            let (width, height) = self.final_geometry();
-
-            let mut image = libheif_rs::Image::new(
-                width,
-                height,
-                libheif_rs::ColorSpace::Rgb(libheif_rs::RgbChroma::C444),
-            )?;
-            image.create_plane(Channel::R, width, height, 8)?;
-            image.create_plane(Channel::G, width, height, 8)?;
-            image.create_plane(Channel::B, width, height, 8)?;
-
-            let planes = image.planes_mut();
-            let Some(plane_r) = planes.r else {
-                return Err(Error::ImageEncodingError(
-                    "Failed to get R plane for HEIF image".to_string(),
-                ));
-            };
-            let stride = plane_r.stride;
-
-            let data_r = plane_r.data;
-            let (Some(plane_g), Some(plane_b)) = (planes.g, planes.b) else {
-                return Err(Error::ImageEncodingError(
-                    "Failed to get G or B plane for HEIF image".to_string(),
-                ));
-            };
-            let data_g = plane_g.data;
-            let data_b = plane_b.data;
-
-            // Fill data of planes by some "pixels"
-            for y in 0..height {
-                let mut pixel_index = stride * y as usize;
-                for x in 0..width {
-                    let color = (x * y).to_le_bytes();
-                    data_r[pixel_index] = color[0];
-                    data_g[pixel_index] = color[1];
-                    data_b[pixel_index] = color[2];
-                    pixel_index += 1;
-                }
-            }
-
-            encoder.set_quality(EncoderQuality::LossLess)?;
-            context.encode_image(&image, &mut encoder, None)?;
-            let heif_data = context.write_to_bytes()?;
-            Ok(heif_data)
+            self.output_heif()
         }
     }
 

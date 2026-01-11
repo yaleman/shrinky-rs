@@ -1,7 +1,9 @@
+use std::str::FromStr;
+
 use shrinky_rs::imagedata::Geometry;
 
 #[test]
-fn test_geometry_from_string() {
+fn test_geometry() {
     let expected = [
         ("800x600", Some((Some(800), Some(600)))),
         ("800x", Some((Some(800), None))),
@@ -25,6 +27,45 @@ fn test_geometry_from_string() {
             None => {
                 assert!(result.is_err(), "Expected Err for input '{}'", input);
             }
+        }
+    }
+
+    let empty_geometry = Geometry::empty();
+    assert!(empty_geometry.is_empty(), "Expected geometry to be empty");
+
+    assert!(
+        Geometry::from_str("800x1234x12345").is_err(),
+        "Expected Err for invalid input with multiple 'x' characters"
+    );
+
+    assert!(
+        Geometry::from_str("abcx600").is_err(),
+        "Expected Err for non-numeric width"
+    );
+
+    assert!(
+        Geometry::from_str("800xdef").is_err(),
+        "Expected Err for non-numeric height"
+    );
+
+    for should_int_error in [
+        Geometry::from_str(
+            "80000000000000000000000000000000000010987230984710984709182374092187409821740981234x",
+        )
+        .expect_err("should return an integer error"),
+        Geometry::from_str(
+            "x80000000000000000000000000000000000010987230984710984709182374092187409821740981234",
+        )
+        .expect_err("should return an integer error"),
+        Geometry::from_str(
+            "800000000000000000000000000000000000x800000000000000000000000000000000000",
+        )
+        .expect_err("should return an integer error"),
+    ] {
+        dbg!(&should_int_error);
+        match should_int_error {
+            shrinky_rs::Error::InvalidGeometry(_) => {}
+            _ => panic!("Expected InvalidGeometry error"),
         }
     }
 }
