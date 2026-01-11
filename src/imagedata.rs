@@ -238,7 +238,7 @@ impl Image {
     fn output_heif(&self) -> Result<Vec<u8>, Error> {
         let lib_heif = LibHeif::new();
         let mut context = HeifContext::new()?;
-        let mut encoder = lib_heif.encoder_for_format(CompressionFormat::Av1)?;
+        let mut encoder = lib_heif.encoder_for_format(CompressionFormat::Hevc)?;
         let Geometry { width, height } = self.final_geometry();
 
         let width = width.ok_or_else(|| {
@@ -256,66 +256,47 @@ impl Image {
         image.create_plane(Channel::R, width, height, 8)?;
         image.create_plane(Channel::G, width, height, 8)?;
         image.create_plane(Channel::B, width, height, 8)?;
+        image.create_plane(Channel::Alpha, width, height, 8)?;
 
         let planes = image.planes_mut();
 
-        let (Some(plane_r), Some(plane_g), Some(plane_b)) = (planes.r, planes.g, planes.b) else {
+        let (Some(plane_r), Some(plane_g), Some(plane_b), Some(plane_a)) =
+            (planes.r, planes.g, planes.b, planes.a)
+        else {
             return Err(Error::ImageEncodingError(
                 "Failed to get one of the planes for HEIF image, this is definitely a bug in the code!".to_string(),
             ));
         };
 
-        if let Some(pixels) = self.image.as_rgba8() {
-            debug!("handling rgb8 image with alpha channel for heif encoding");
-            pixels
-                .pixels()
+        let stride = plane_r.stride as u32;
+        debug!(
+            "HEIF encoding image with width {}, height {}, stride {}",
+            width, height, stride
+        );
+
+        let rgb8 = self.image.clone().into_rgba8();
+        rgb8.enumerate_pixels().for_each(|(x, y, pixel)| {
+            let offset = (y * stride + x) as usize;
+            pixel
+                .0
+                .iter()
                 .enumerate()
-                .for_each(|(pixel_index, pixel)| {
-                    pixel
-                        .0
-                        .iter()
-                        .enumerate()
-                        .for_each(|(i, &channel)| match i {
-                            0 => {
-                                plane_r.data[pixel_index] = channel;
-                            }
-                            1 => {
-                                plane_g.data[pixel_index] = channel;
-                            }
-                            2 => {
-                                plane_b.data[pixel_index] = channel;
-                            }
-                            _ => {}
-                        });
+                .for_each(|(i, &channel)| match i {
+                    0 => {
+                        plane_r.data[offset] = channel;
+                    }
+                    1 => {
+                        plane_g.data[offset] = channel;
+                    }
+                    2 => {
+                        plane_b.data[offset] = channel;
+                    }
+                    3 => {
+                        plane_a.data[offset] = channel;
+                    }
+                    _ => {}
                 });
-        } else if let Some(pixels) = self.image.as_rgb8() {
-            debug!("handling rgb8 image without alpha channel for heif encoding");
-            pixels
-                .pixels()
-                .enumerate()
-                .for_each(|(pixel_index, pixel)| {
-                    pixel
-                        .0
-                        .iter()
-                        .enumerate()
-                        .for_each(|(i, &channel)| match i {
-                            0 => {
-                                plane_r.data[pixel_index] = channel;
-                            }
-                            1 => {
-                                plane_g.data[pixel_index] = channel;
-                            }
-                            2 => {
-                                plane_b.data[pixel_index] = channel;
-                            }
-                            _ => {}
-                        });
-                });
-        } else {
-            return Err(Error::ImageEncodingError(
-                "Failed to get RGB8-ish data from image for HEIF encoding".to_string(),
-            ));
-        }
+        });
 
         encoder.set_quality(EncoderQuality::Lossy(85))?;
         context.encode_image(&image, &mut encoder, None)?;

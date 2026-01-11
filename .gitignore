@@ -1,3 +1,6 @@
 /target
 tarpaulin-report.html
 .envrc
+./*.heic
+./*.jpg
+.DS_Store
