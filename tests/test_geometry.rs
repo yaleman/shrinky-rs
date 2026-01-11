@@ -23,6 +23,12 @@ fn test_geometry() {
                 let geometry = result.expect("Failed to unwrap geometry");
                 assert_eq!(geometry.width, *w, "Width mismatch for input '{}'", input);
                 assert_eq!(geometry.height, *h, "Height mismatch for input '{}'", input);
+                assert_eq!(
+                    format!("{}", geometry),
+                    input.to_string(),
+                    "String representation mismatch for input '{}'",
+                    input
+                );
             }
             None => {
                 assert!(result.is_err(), "Expected Err for input '{}'", input);

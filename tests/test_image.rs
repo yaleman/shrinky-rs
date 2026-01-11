@@ -35,16 +35,16 @@ fn test_loading_multiple() {
         });
         let geometry = img.final_geometry();
 
-        let (width, height) = geometry;
+        let Geometry { width, height } = geometry;
         assert_eq!(
             width,
-            JPG_EXPECTED_WIDTH,
+            Some(JPG_EXPECTED_WIDTH),
             "{} Image width should be {JPG_EXPECTED_WIDTH}",
             fmt.extension()
         );
         assert_eq!(
             height,
-            JPG_EXPECTED_HEIGHT,
+            Some(JPG_EXPECTED_HEIGHT),
             "{} Image height should be {JPG_EXPECTED_HEIGHT}",
             fmt.extension()
         );
@@ -61,13 +61,15 @@ fn test_loading_png() {
 
     let mut img = Image::try_from(&img_path).expect("failed to load Image from path");
 
-    let (width, height) = img.final_geometry();
+    let Geometry { width, height } = img.final_geometry();
     assert_eq!(
-        width, PNG_EXPECTED_WIDTH,
+        width,
+        Some(PNG_EXPECTED_WIDTH),
         "Image width should be {PNG_EXPECTED_WIDTH}"
     );
     assert_eq!(
-        height, PNG_EXPECTED_HEIGHT,
+        height,
+        Some(PNG_EXPECTED_HEIGHT),
         "Image height should be {PNG_EXPECTED_HEIGHT}"
     );
 
@@ -77,11 +79,30 @@ fn test_loading_png() {
     });
     assert_eq!(
         img.final_geometry(),
-        (
-            1234,
-            (PNG_EXPECTED_HEIGHT as f32 * (1234_f32 / PNG_EXPECTED_WIDTH as f32)) as u32
-        ),
+        Geometry {
+            width: Some(1234),
+            height: Some(
+                (PNG_EXPECTED_HEIGHT as f32 * (1234_f32 / PNG_EXPECTED_WIDTH as f32)) as u32
+            ),
+        },
         "Image should have target geometry set"
+    );
+
+    // test resising the image
+    img = img.with_target_geometry(Geometry {
+        width: Some(400),
+        height: Some(400),
+    });
+    img.resize().expect("failed to resize image");
+
+    assert!(
+        img.final_geometry() != Geometry::new(PNG_EXPECTED_WIDTH, PNG_EXPECTED_HEIGHT),
+        "Image should have updated geometry"
+    );
+
+    assert!(
+        img.final_geometry() == Geometry::new(400, 400),
+        "Image should be resized to 400x400"
     );
 }
 

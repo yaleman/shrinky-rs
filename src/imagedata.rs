@@ -9,7 +9,7 @@ use rayon::iter::IntoParallelIterator;
 
 use crate::{Error, ImageFormat};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Geometry {
     pub width: Option<u32>,
     pub height: Option<u32>,
@@ -99,7 +99,6 @@ pub struct Image {
     pub original_geometry: Geometry,
     pub target_geometry: Option<Geometry>,
     pub output_format: Option<crate::ImageFormat>,
-    pub updated_geometry: Option<Geometry>,
     pub image: image::DynamicImage,
 }
 
@@ -120,7 +119,6 @@ impl TryFrom<&PathBuf> for Image {
             image,
             original_file_size: original_size,
             original_geometry,
-            updated_geometry: None,
         })
     }
 }
@@ -186,52 +184,50 @@ impl Image {
     }
 
     /// Get the final target geometry of the image after resizing (if any)
-    pub fn final_geometry(&self) -> (u32, u32) {
+    pub fn final_geometry(&self) -> Geometry {
         match self.target_geometry {
             Some(ref geom) => match geom {
                 Geometry {
-                    width: Some(w),
-                    height: Some(h),
-                } => (*w, *h),
+                    width: Some(_w),
+                    height: Some(_h),
+                } => geom.clone(),
                 Geometry {
                     width: Some(w),
                     height: None,
                 } => {
                     let ratio = *w as f32 / self.image.width() as f32;
-                    (*w, (self.image.height() as f32 * ratio) as u32)
+                    Geometry::new(*w, (self.image.height() as f32 * ratio) as u32)
                 }
                 Geometry {
                     width: None,
                     height: Some(h),
                 } => {
                     let ratio = *h as f32 / self.image.height() as f32;
-                    ((self.image.width() as f32 * ratio) as u32, *h)
+                    Geometry::new((self.image.width() as f32 * ratio) as u32, *h)
                 }
                 Geometry {
                     width: None,
                     height: None,
-                } => (self.image.width(), self.image.height()),
+                } => Geometry::new(self.image.width(), self.image.height()),
             },
-            None => (self.image.width(), self.image.height()),
+            None => Geometry::new(self.image.width(), self.image.height()),
         }
     }
 
     pub fn resize(&mut self) -> Result<DynamicImage, Error> {
         let final_geometry = self.final_geometry();
-        if final_geometry != (self.image.width(), self.image.height()) {
+        if final_geometry != Geometry::new(self.image.width(), self.image.height()) {
             debug!(
-                "Resizing image from {}x{} to {}x{}",
+                "Resizing image from {}x{} to {}",
                 self.image.width(),
                 self.image.height(),
-                final_geometry.0,
-                final_geometry.1
+                final_geometry,
             );
             let resized_img = self.image.resize_exact(
-                final_geometry.0,
-                final_geometry.1,
+                final_geometry.width.unwrap_or(0), // safe unwraps, as final_geometry is derived from existing dimensions
+                final_geometry.height.unwrap_or(0), // safe unwraps, as final_geometry is derived from existing dimensions
                 image::imageops::FilterType::Lanczos3,
             );
-            self.updated_geometry = Some(Geometry::new(final_geometry.0, final_geometry.1));
             Ok(resized_img)
         } else {
             Ok(self.image.clone())
@@ -243,7 +239,14 @@ impl Image {
         let lib_heif = LibHeif::new();
         let mut context = HeifContext::new()?;
         let mut encoder = lib_heif.encoder_for_format(CompressionFormat::Av1)?;
-        let (width, height) = self.final_geometry();
+        let Geometry { width, height } = self.final_geometry();
+
+        let width = width.ok_or_else(|| {
+            Error::ImageEncodingError("Width must be specified for HEIF encoding".to_string())
+        })?;
+        let height = height.ok_or_else(|| {
+            Error::ImageEncodingError("Height must be specified for HEIF encoding".to_string())
+        })?;
 
         let mut image = libheif_rs::Image::new(
             width,
