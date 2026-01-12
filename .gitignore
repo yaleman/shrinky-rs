@@ -4,3 +4,5 @@ tarpaulin-report.html
 ./*.heic
 ./*.jpg
 .DS_Store
+CLAUDE.md
+*.profraw

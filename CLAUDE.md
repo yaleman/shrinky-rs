@@ -13,6 +13,8 @@ shrinky-rs is a Rust reimplementation of the Python "shrinky" tool - an image co
 - **libheif-rs**: For HEIC/HEIF format support
 - **rayon**: For parallel image format optimization
 - **clap**: CLI argument parsing with derive macros
+- **log** and **stderrlog**: Logging infrastructure
+- **strum**: Enum utilities with derive macros
 
 ## Build and Development Commands
 
@@ -63,7 +65,7 @@ Geometry parsing supports three formats:
 The codebase enforces very strict clippy lints in lib.rs:
 
 - **Forbidden**: `unwrap_used`, `expect_used`, `panic`, `todo`, `unimplemented`
-- **Exception**: Tests allow `expect` (via clippy.toml: `allow-expect-in-tests = true`)
+- **Exception**: Tests allow `expect` and `dbg!` (via clippy.toml: `allow-expect-in-tests = true`, `allow-dbg-in-tests = true`)
 - **Forbidden in tests**: `unwrap`, `panic` (even in tests)
 - All warnings treated as denials
 
@@ -75,7 +77,7 @@ Test files are in `tests/` directory:
 
 - `test_geometry.rs`: Geometry parsing tests
 - `test_image.rs`: Image loading and processing tests
-- `test_outputformat.rs`: Format conversion tests
+- `test_imageformat.rs`: Image format conversion tests
 - `test_images/`: Contains sample images in all supported formats (bruny-oysters.{jpg,png,webp,avif,heif,heic})
 
 Run individual test files with: `cargo test --test test_geometry`
