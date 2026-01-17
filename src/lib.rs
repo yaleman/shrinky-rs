@@ -120,10 +120,11 @@ impl TryInto<image::ImageFormat> for ImageFormat {
             ImageFormat::Jpg => Ok(image::ImageFormat::Jpeg),
             ImageFormat::Png => Ok(image::ImageFormat::Png),
             ImageFormat::Webp => Ok(image::ImageFormat::WebP),
-            ImageFormat::Avif => Ok(image::ImageFormat::Avif),
-            ImageFormat::Heic | ImageFormat::Heif => Err(Error::UnsupportedFormat(
-                "HEIC/HEIF format not supported by image crate".to_string(),
-            )),
+            ImageFormat::Avif | ImageFormat::Heic | ImageFormat::Heif => {
+                Err(Error::UnsupportedFormat(
+                    "AVIF/HEIC/HEIF format not supported by image crate".to_string(),
+                ))
+            }
         }
     }
 }

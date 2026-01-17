@@ -52,11 +52,12 @@ fn test_imageformat() {
     assert!(ImageFormat::Jpg.is_native_image_format());
     assert!(!ImageFormat::Avif.is_native_image_format());
 
+    // test that we can convert to image::ImageFormat
     for (fmt, expected_result) in [
         (ImageFormat::Jpg, true),
         (ImageFormat::Png, true),
         (ImageFormat::Webp, true),
-        (ImageFormat::Avif, true),
+        (ImageFormat::Avif, false),
         (ImageFormat::Heic, false),
         (ImageFormat::Heif, false),
     ] {
