@@ -2,7 +2,7 @@ use clap::Parser;
 use log::{debug, error, info, warn};
 use shrinky_rs::{
     ImageFormat,
-    cli::Cli,
+    cli::{Cli, setup_logging},
     imagedata::{Geometry, Image},
 };
 use std::{
@@ -81,19 +81,7 @@ fn prompt_delete_source(
 
 fn main() {
     let cli = Cli::parse();
-    let log_level = if cli.debug {
-        log::Level::Debug
-    } else {
-        log::Level::Info
-    };
-    if let Err(err) = stderrlog::new()
-        .verbosity(log_level)
-        .show_module_names(cli.debug)
-        .init()
-    {
-        eprintln!("Failed to initialize logger: {}", err);
-        std::process::exit(1);
-    }
+    setup_logging(cli.debug);
 
     if !cli.filename.exists() {
         error!("File not found: {}", cli.filename.display());

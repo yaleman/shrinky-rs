@@ -32,3 +32,26 @@ pub struct Cli {
     #[arg(short, long, default_value = "false")]
     pub info: bool,
 }
+
+pub fn setup_logging(debug: bool) {
+    let log_level = if debug {
+        log::Level::Debug
+    } else {
+        log::Level::Info
+    };
+    if let Err(err) = stderrlog::new()
+        .verbosity(log_level)
+        .show_module_names(debug)
+        .init()
+    {
+        eprintln!("Failed to initialize logger: {}", err);
+        std::process::exit(1);
+    }
+}
+
+pub fn test_setup_logging() {
+    let _ = stderrlog::new()
+        .verbosity(log::Level::Debug)
+        .show_module_names(true)
+        .init();
+}

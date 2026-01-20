@@ -1,9 +1,10 @@
 use libheif_rs::HeifError;
-use shrinky_rs::ImageFormat;
+use shrinky_rs::{ImageFormat, cli::test_setup_logging};
 use std::str::FromStr;
 
 #[test]
 fn test_imageformat() {
+    test_setup_logging();
     let expected = [
         ("jpg", Some(ImageFormat::Jpg)),
         ("jpeg", Some(ImageFormat::Jpg)),
@@ -82,6 +83,8 @@ fn test_imageformat() {
 
 #[test]
 fn test_error() {
+    test_setup_logging();
+
     let error = HeifError::from_heif_error(libheif_sys::heif_error {
         code: 5u32,
         subcode: 42,
