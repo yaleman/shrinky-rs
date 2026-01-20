@@ -1,9 +1,10 @@
 use std::str::FromStr;
 
-use shrinky_rs::imagedata::Geometry;
+use shrinky_rs::{cli::test_setup_logging, imagedata::Geometry};
 
 #[test]
 fn test_geometry() {
+    test_setup_logging();
     let expected = [
         ("800x600", Some((Some(800), Some(600)))),
         ("800x", Some((Some(800), None))),

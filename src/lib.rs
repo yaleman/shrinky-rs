@@ -21,9 +21,8 @@
 pub mod cli;
 pub mod imagedata;
 
-use std::{ffi::OsString, fmt::Display, path::PathBuf, str::FromStr};
-
 use libheif_rs::HeifError;
+use std::{ffi::OsString, fmt::Display, path::PathBuf, str::FromStr};
 use strum::EnumIter;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, EnumIter)]

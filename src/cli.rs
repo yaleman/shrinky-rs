@@ -1,8 +1,6 @@
-use std::path::PathBuf;
-
-use clap::Parser;
-
 use crate::ImageFormat;
+use clap::Parser;
+use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
 #[command(name = "Shrinky", version = env!("CARGO_PKG_VERSION"), author = "James Hodgkinson", about = "A simple image optimization tool")]
@@ -29,4 +27,15 @@ pub struct Cli {
     /// Overwrite existing files without prompting
     #[arg(short, long, default_value = "false", env = "SHRINKY_FORCE")]
     pub force: bool,
+
+    /// Show image info and return
+    #[arg(short, long, default_value = "false")]
+    pub info: bool,
+}
+
+pub fn test_setup_logging() {
+    let _ = stderrlog::new()
+        .verbosity(log::Level::Debug)
+        .show_module_names(true)
+        .init();
 }

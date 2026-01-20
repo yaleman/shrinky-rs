@@ -1,14 +1,15 @@
-use std::io::{self, Write};
-use std::path::Path;
-use std::str::FromStr;
-
 use clap::Parser;
-
 use log::{debug, error, info, warn};
 use shrinky_rs::{
     ImageFormat,
     cli::Cli,
     imagedata::{Geometry, Image},
+};
+use std::{
+    cmp::max,
+    io::{self, Write},
+    path::Path,
+    str::FromStr,
 };
 
 /// Format a byte count as a string with comma separators
@@ -78,21 +79,25 @@ fn prompt_delete_source(
     Ok(matches!(response.as_str(), "y" | "yes"))
 }
 
-fn main() {
-    let cli = Cli::parse();
-    let log_level = if cli.debug {
+pub fn setup_logging(debug: bool) {
+    let log_level = if debug {
         log::Level::Debug
     } else {
         log::Level::Info
     };
     if let Err(err) = stderrlog::new()
         .verbosity(log_level)
-        .show_module_names(cli.debug)
+        .show_module_names(debug)
         .init()
     {
         eprintln!("Failed to initialize logger: {}", err);
         std::process::exit(1);
     }
+}
+
+fn main() {
+    let cli = Cli::parse();
+    setup_logging(cli.debug);
 
     if !cli.filename.exists() {
         error!("File not found: {}", cli.filename.display());
@@ -103,7 +108,7 @@ fn main() {
         std::process::exit(1);
     }
 
-    info!("Processing image: {}", cli.filename.display());
+    debug!("Processing image: {}", cli.filename.display());
     let mut image = match Image::try_from(&cli.filename) {
         Ok(img) => img,
         Err(e) => {
@@ -111,6 +116,14 @@ fn main() {
             std::process::exit(1);
         }
     };
+    if cli.info {
+        info!(
+            "Dimensions: {}x{} Size: {} bytes",
+            image.image.width(),
+            image.image.height(),
+            format_bytes(image.original_file_size)
+        );
+    }
 
     if let Some(target_geometry) = cli.geometry {
         let target_geometry = match Geometry::from_str(target_geometry.as_str()) {
@@ -142,11 +155,7 @@ fn main() {
     let bytes_to_write = match cli.output_type {
         None => match image.auto_format() {
             Ok((format, data)) => {
-                info!(
-                    "Auto-optimized image to format {:?}, size {} bytes",
-                    format,
-                    data.len()
-                );
+                debug!("Auto-optimized image to format {}", format,);
                 image.output_format = Some(format);
                 data
             }
@@ -158,7 +167,7 @@ fn main() {
         Some(format) => match image.output_as_format(format) {
             Ok(data) => {
                 info!(
-                    "Encoded image to format {:?}, size {} bytes",
+                    "Encoded image to format {}, size {} bytes",
                     format,
                     data.len()
                 );
@@ -187,10 +196,15 @@ fn main() {
 
     match std::fs::write(image.output_filename(), &bytes_to_write) {
         Ok(_) => {
+            let original_size = max(image.original_file_size, 1) as f64;
+            let output_size = max(bytes_to_write.len(), 1) as f64;
+            let pct_change = output_size / original_size * 100.0;
             info!(
-                "Wrote optimized image to {} ({} bytes)",
+                "Wrote optimized image to {} ({} -> {} bytes, {:.1}% of original)",
                 image.output_filename().display(),
-                bytes_to_write.len()
+                format_bytes(original_size as u64),
+                format_bytes(output_size as u64),
+                pct_change
             );
         }
         Err(e) => {

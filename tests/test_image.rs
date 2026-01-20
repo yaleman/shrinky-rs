@@ -1,6 +1,7 @@
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use shrinky_rs::{
     ImageFormat,
+    cli::test_setup_logging,
     imagedata::{Geometry, Image},
 };
 
@@ -12,6 +13,7 @@ const PNG_EXPECTED_HEIGHT: u32 = 800;
 
 #[test]
 fn test_loading_multiple() {
+    test_setup_logging();
     let test_fmts = vec![
         ImageFormat::Jpg,
         ImageFormat::Webp,
@@ -53,6 +55,7 @@ fn test_loading_multiple() {
 
 #[test]
 fn test_with_png() {
+    test_setup_logging();
     let img_path = std::path::PathBuf::from(format!(
         "tests/test_images/{}.{}",
         IMAGE_NAME,
@@ -118,6 +121,7 @@ fn test_with_png() {
 
 #[test]
 fn test_output_format() {
+    test_setup_logging();
     let mut image = Image::try_from(&std::path::PathBuf::from(format!(
         "tests/test_images/{}.{}",
         IMAGE_NAME,
@@ -144,7 +148,39 @@ fn test_output_format() {
         "Output filename should have the correct extension when output format is set"
     );
     assert!(
-        !image.will_overwrite(),
-        "Image should not report it will overwrite when output format does not match input file extension"
+        image.will_overwrite(),
+        "Image should report it will overwrite because test file should exist: input={} output={}, format={:?}",
+        image.input_filename.display(),
+        image.output_filename().display(),
+        image.output_format
+    );
+
+    assert_eq!(
+        image.resize().expect("Failed to resize image"),
+        image.image,
+        "Resizing without changing geometry should be a no-op"
+    );
+
+    image = image.with_target_geometry(Geometry {
+        width: Some(100),
+        height: None,
+    });
+
+    let resized_image = image.resize().expect("Failed to resize image");
+    assert!(
+        resized_image != image.image,
+        "Resizing with changed geometry should produce a different image"
+    );
+    assert!(
+        resized_image.width() == 100,
+        "Resized image should have width of 100"
+    );
+
+    let (format, _bytes) = image
+        .auto_format()
+        .expect("Failed to convert to auto format");
+    assert!(
+        format != ImageFormat::Png,
+        "Image output format should be something other than PNG 'cause that's huge"
     );
 }
