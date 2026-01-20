@@ -1,7 +1,6 @@
-use std::str::FromStr;
-
 use libheif_rs::HeifError;
 use shrinky_rs::ImageFormat;
+use std::str::FromStr;
 
 #[test]
 fn test_imageformat() {

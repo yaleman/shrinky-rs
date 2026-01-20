@@ -134,34 +134,9 @@ impl Image {
         self
     }
 
+    /// Check if output file will overwrite existing file
     pub fn will_overwrite(&self) -> bool {
-        if let Some(ref format) = self.output_format {
-            match format {
-                ImageFormat::Png => self
-                    .input_filename
-                    .extension()
-                    .is_some_and(|ext| ext.eq_ignore_ascii_case("png")),
-                ImageFormat::Jpg => self
-                    .input_filename
-                    .extension()
-                    .is_some_and(|ext| ext.eq_ignore_ascii_case("jpg")),
-                ImageFormat::Webp => self
-                    .input_filename
-                    .extension()
-                    .is_some_and(|ext| ext.eq_ignore_ascii_case("webp")),
-                ImageFormat::Heif | ImageFormat::Heic => {
-                    self.input_filename.extension().is_some_and(|ext| {
-                        ext.eq_ignore_ascii_case("heif") || ext.eq_ignore_ascii_case("heic")
-                    })
-                }
-                ImageFormat::Avif => self
-                    .input_filename
-                    .extension()
-                    .is_some_and(|ext| ext.eq_ignore_ascii_case("avif")),
-            }
-        } else {
-            true
-        }
+        self.output_filename().exists()
     }
 
     pub fn load_image(input_filename: &PathBuf) -> Result<(DynamicImage, Geometry), Error> {

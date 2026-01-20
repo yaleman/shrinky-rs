@@ -144,7 +144,10 @@ fn test_output_format() {
         "Output filename should have the correct extension when output format is set"
     );
     assert!(
-        !image.will_overwrite(),
-        "Image should not report it will overwrite when output format does not match input file extension"
+        image.will_overwrite(),
+        "Image should report it will overwrite because test file should exist: input={} output={}, format={:?}",
+        image.input_filename.display(),
+        image.output_filename().display(),
+        image.output_format
     );
 }
