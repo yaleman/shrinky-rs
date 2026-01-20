@@ -2,7 +2,7 @@ use clap::Parser;
 use log::{debug, error, info, warn};
 use shrinky_rs::{
     ImageFormat,
-    cli::{Cli, setup_logging},
+    cli::Cli,
     imagedata::{Geometry, Image},
 };
 use std::{
@@ -77,6 +77,22 @@ fn prompt_delete_source(
 
     let response = response.trim().to_lowercase();
     Ok(matches!(response.as_str(), "y" | "yes"))
+}
+
+pub fn setup_logging(debug: bool) {
+    let log_level = if debug {
+        log::Level::Debug
+    } else {
+        log::Level::Info
+    };
+    if let Err(err) = stderrlog::new()
+        .verbosity(log_level)
+        .show_module_names(debug)
+        .init()
+    {
+        eprintln!("Failed to initialize logger: {}", err);
+        std::process::exit(1);
+    }
 }
 
 fn main() {
