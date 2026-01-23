@@ -20,5 +20,5 @@ stderrlog = "0.6.0"
 strum = { version = "0.27.2", features = ["derive", "strum_macros"] }
 
 [dev-dependencies]
-libheif-sys = "5.0.0"
+libheif-sys = "5.1.1"
 rayon = "1.11.0"

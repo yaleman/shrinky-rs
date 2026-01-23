@@ -788,9 +788,9 @@ dependencies = [
 
 [[package]]
 name = "libheif-sys"
-version = "5.0.0+1.20.2"
+version = "5.1.1+1.21.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "99e20d554f655767996b08f1c74398410444e5d250c8439c5862fd7959b66f6b"
+checksum = "03b69722f9386e24ae14655f8faddff28cb6a9a5511d7ffdde3a4499b51cca07"
 dependencies = [
  "cfg-if",
  "libc",
