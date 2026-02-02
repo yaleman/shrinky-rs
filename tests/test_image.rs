@@ -184,3 +184,33 @@ fn test_output_format() {
         "Image output format should be something other than PNG 'cause that's huge"
     );
 }
+
+#[test]
+fn test_output_filename_never_jpeg() {
+    test_setup_logging();
+    let base_image = Image {
+        original_file_size: 0,
+        input_filename: std::path::PathBuf::from("tests/test_images/sample.jpeg"),
+        original_geometry: Geometry::new(1, 1),
+        target_geometry: None,
+        output_format: None,
+        image: image::DynamicImage::new_rgba8(1, 1),
+    };
+
+    assert_eq!(
+        base_image.output_filename(),
+        std::path::PathBuf::from("tests/test_images/sample.jpg"),
+        "Output filename should normalize .jpeg to .jpg"
+    );
+
+    let image_with_output = Image {
+        output_format: Some(ImageFormat::Jpg),
+        ..base_image.clone()
+    };
+
+    assert_eq!(
+        image_with_output.output_filename(),
+        std::path::PathBuf::from("tests/test_images/sample.jpg"),
+        "Output filename should use .jpg for JPG output"
+    );
+}

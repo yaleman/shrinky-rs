@@ -21,12 +21,14 @@
 pub mod cli;
 pub mod imagedata;
 
+use clap::ValueEnum;
 use libheif_rs::HeifError;
-use std::{ffi::OsString, fmt::Display, path::PathBuf, str::FromStr};
+use std::{fmt::Display, path::PathBuf, str::FromStr};
 use strum::EnumIter;
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, EnumIter)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, EnumIter, ValueEnum)]
 pub enum ImageFormat {
+    #[value(alias = "jpeg")]
     Jpg,
     Png,
     Webp,
@@ -59,7 +61,7 @@ impl ImageFormat {
             .rsplit('.')
             .next()
             .ok_or_else(|| Error::UnsupportedFormat(filename.to_string()))?;
-        ImageFormat::from_str(ext)
+        <ImageFormat as std::str::FromStr>::from_str(ext)
     }
 
     pub fn is_native_image_format(&self) -> bool {
@@ -91,13 +93,6 @@ impl FromStr for ImageFormat {
             "heif" => Ok(ImageFormat::Heif),
             _ => Err(Error::UnsupportedFormat(s.to_string())),
         }
-    }
-}
-
-impl From<OsString> for ImageFormat {
-    fn from(os_str: OsString) -> Self {
-        let s = os_str.to_string_lossy();
-        ImageFormat::from_str(&s).unwrap_or(ImageFormat::Jpg)
     }
 }
 
