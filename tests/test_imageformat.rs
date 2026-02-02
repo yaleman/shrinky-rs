@@ -32,20 +32,20 @@ fn test_imageformat() {
     assert_eq!(format!("{}", ImageFormat::Jpg), "JPG");
 
     assert_eq!(
-        ImageFormat::from_str("testfile.jpg").expect("Failed to parse from filename"),
+        <ImageFormat as FromStr>::from_str("testfile.jpg").expect("Failed to parse from filename"),
         ImageFormat::Jpg
     );
 
     assert_eq!(
-        ImageFormat::from_str("jpeg").expect("Failed to parse from filename"),
+        <ImageFormat as FromStr>::from_str("jpeg").expect("Failed to parse from filename"),
         ImageFormat::Jpg
     );
     assert_eq!(
-        ImageFormat::from_str("jpg").expect("Failed to parse from filename"),
+        <ImageFormat as FromStr>::from_str("jpg").expect("Failed to parse from filename"),
         ImageFormat::Jpg
     );
 
-    assert!(ImageFormat::from_str("cheese").is_err());
+    assert!(<ImageFormat as FromStr>::from_str("cheese").is_err());
 
     assert!(ImageFormat::all().len() == 6);
 

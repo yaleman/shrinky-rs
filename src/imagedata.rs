@@ -299,13 +299,23 @@ impl Image {
     }
 
     pub fn output_filename(&self) -> PathBuf {
-        if let Some(ref format) = self.output_format {
-            let mut output_path = self.input_filename.clone();
-            output_path.set_extension(format.extension());
-            output_path
+        let mut output_path = if let Some(ref format) = self.output_format {
+            let mut path = self.input_filename.clone();
+            path.set_extension(format.extension());
+            path
         } else {
             self.input_filename.clone()
+        };
+
+        if output_path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .map_or(false, |ext| ext.eq_ignore_ascii_case("jpeg"))
+        {
+            output_path.set_extension("jpg");
         }
+
+        output_path
     }
 
     pub fn auto_format(&self) -> Result<(ImageFormat, Vec<u8>), Error> {

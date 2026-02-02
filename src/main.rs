@@ -156,6 +156,20 @@ fn main() {
         None => match image.auto_format() {
             Ok((format, data)) => {
                 debug!("Auto-optimized image to format {}", format,);
+                if data.len() > image.original_file_size as usize {
+                    let original_size = image.original_file_size as usize;
+                    let increase = data.len() - original_size;
+                    let pct_change = (data.len() as f64 / max(original_size, 1) as f64) * 100.0;
+                    warn!(
+                        "Auto-mode output would be larger; skipping write (format {}, {} -> {} bytes, +{}, {:.1}%)",
+                        format,
+                        format_bytes(original_size as u64),
+                        format_bytes(data.len() as u64),
+                        format_bytes(increase as u64),
+                        pct_change
+                    );
+                    return;
+                }
                 image.output_format = Some(format);
                 data
             }
