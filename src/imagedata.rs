@@ -310,7 +310,7 @@ impl Image {
         if output_path
             .extension()
             .and_then(|ext| ext.to_str())
-            .map_or(false, |ext| ext.eq_ignore_ascii_case("jpeg"))
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("jpeg"))
         {
             output_path.set_extension("jpg");
         }

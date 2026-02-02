@@ -9,6 +9,7 @@ use std::{
     cmp::max,
     io::{self, Write},
     path::Path,
+    process::ExitCode,
     str::FromStr,
 };
 
@@ -95,17 +96,17 @@ pub fn setup_logging(debug: bool) {
     }
 }
 
-fn main() {
+fn main() -> ExitCode {
     let cli = Cli::parse();
     setup_logging(cli.debug);
 
     if !cli.filename.exists() {
         error!("File not found: {}", cli.filename.display());
-        std::process::exit(1);
+        return ExitCode::FAILURE;
     }
     if !cli.filename.is_file() {
         error!("Not a file: {}", cli.filename.display());
-        std::process::exit(1);
+        return ExitCode::FAILURE;
     }
 
     debug!("Processing image: {}", cli.filename.display());
@@ -113,7 +114,7 @@ fn main() {
         Ok(img) => img,
         Err(e) => {
             error!("Error loading image: {:?}", e);
-            std::process::exit(1);
+            return ExitCode::FAILURE;
         }
     };
     if cli.info {
@@ -130,7 +131,7 @@ fn main() {
             Ok(geom) => geom,
             Err(e) => {
                 error!("Error parsing geometry: {:?}", e);
-                std::process::exit(1);
+                return ExitCode::FAILURE;
             }
         };
         if !target_geometry.is_empty() {
@@ -146,7 +147,7 @@ fn main() {
                 }
                 Err(e) => {
                     error!("Error resizing image: {:?}", e);
-                    std::process::exit(1);
+                    return ExitCode::FAILURE;
                 }
             }
         }
@@ -160,7 +161,7 @@ fn main() {
                     let original_size = image.original_file_size as usize;
                     let increase = data.len() - original_size;
                     let pct_change = (data.len() as f64 / max(original_size, 1) as f64) * 100.0;
-                    warn!(
+                    error!(
                         "Auto-mode output would be larger; skipping write (format {}, {} -> {} bytes, +{}, {:.1}%)",
                         format,
                         format_bytes(original_size as u64),
@@ -168,14 +169,14 @@ fn main() {
                         format_bytes(increase as u64),
                         pct_change
                     );
-                    return;
+                    return ExitCode::from(2);
                 }
                 image.output_format = Some(format);
                 data
             }
             Err(e) => {
                 error!("Error auto-optimizing image: {:?}", e);
-                std::process::exit(1);
+                return ExitCode::FAILURE;
             }
         },
         Some(format) => match image.output_as_format(format) {
@@ -190,14 +191,14 @@ fn main() {
             }
             Err(e) => {
                 error!("Error encoding image as {:?}: {:?}", format, e);
-                std::process::exit(1);
+                return ExitCode::FAILURE;
             }
         },
     };
 
     if bytes_to_write.is_empty() {
         error!("No image data to write. This is probably a bug!");
-        std::process::exit(1);
+        return ExitCode::FAILURE;
     }
 
     if image.will_overwrite() && !cli.force {
@@ -205,7 +206,7 @@ fn main() {
             "Output file {} already exists. Use --force to overwrite.",
             image.output_filename().display()
         );
-        std::process::exit(1);
+        return ExitCode::FAILURE;
     }
 
     match std::fs::write(image.output_filename(), &bytes_to_write) {
@@ -227,7 +228,7 @@ fn main() {
                 image.output_filename().display(),
                 e
             );
-            std::process::exit(1);
+            return ExitCode::FAILURE;
         }
     }
 
@@ -307,4 +308,6 @@ fn main() {
             debug!("Skipping deletion: output overwrote input file");
         }
     }
+
+    ExitCode::SUCCESS
 }
