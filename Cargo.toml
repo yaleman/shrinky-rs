@@ -17,7 +17,7 @@ log = { version = "0.4.29", features = [
 ] }
 rayon = "1.11.0"
 stderrlog = "0.6.0"
-strum = { version = "0.27.2", features = ["derive", "strum_macros"] }
+strum = { version = "0.28.0", features = ["derive", "strum_macros"] }
 
 [dev-dependencies]
 libheif-sys = "5.2.0"
