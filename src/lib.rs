@@ -129,6 +129,7 @@ pub enum Error {
     UnsupportedFormat(String),
     InvalidGeometry(String),
     ImageLoadingError(String, image::ImageError),
+    ImageComparisonError(String),
     FileSystem(String),
     ImageEncodingError(String),
 }

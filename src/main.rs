@@ -117,6 +117,7 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
+    image = image.with_output_suffix(cli.output_suffix.clone());
     if cli.info {
         info!(
             "Dimensions: {}x{} Size: {} bytes",
@@ -195,6 +196,67 @@ fn main() -> ExitCode {
             }
         },
     };
+
+    if cli.compare || cli.min_ssim.is_some() || cli.min_psnr.is_some() {
+        let compute_ssim = cli.compare || cli.min_ssim.is_some();
+        let compute_psnr = cli.compare || cli.min_psnr.is_some();
+        match image.compare_to_encoded(&bytes_to_write, compute_ssim, compute_psnr) {
+            Ok(score) => {
+                info!("Perceptual comparison:");
+                if let Some(ssim_score) = score.ssim {
+                    info!("  SSIM: {:.6}", ssim_score);
+                }
+                if let Some(psnr_score) = score.psnr {
+                    if psnr_score.is_infinite() {
+                        info!("  PSNR: inf dB");
+                    } else {
+                        info!("  PSNR: {:.2} dB", psnr_score);
+                    }
+                }
+
+                if let Some(min_ssim) = cli.min_ssim {
+                    if score.ssim.is_none() {
+                        error!("SSIM score was not computed, cannot enforce --min-ssim");
+                        return ExitCode::from(3);
+                    }
+
+                    if let Some(actual_ssim) = score.ssim
+                        && actual_ssim < min_ssim
+                    {
+                        error!(
+                            "Perceptual quality gate failed: SSIM {:.6} is below minimum {}",
+                            actual_ssim, min_ssim
+                        );
+                        return ExitCode::from(3);
+                    }
+                }
+
+                if let Some(min_psnr) = cli.min_psnr {
+                    if score.psnr.is_none() {
+                        error!("PSNR score was not computed, cannot enforce --min-psnr");
+                        return ExitCode::from(3);
+                    }
+
+                    if let Some(actual_psnr) = score.psnr
+                        && actual_psnr < min_psnr
+                    {
+                        error!(
+                            "Perceptual quality gate failed: PSNR {:.2} dB is below minimum {}",
+                            actual_psnr, min_psnr
+                        );
+                        return ExitCode::from(3);
+                    }
+                }
+            }
+            Err(e) => {
+                if cli.min_ssim.is_some() || cli.min_psnr.is_some() {
+                    error!("Perceptual comparison failed: {:?}", e);
+                    return ExitCode::from(3);
+                }
+                warn!("Perceptual comparison failed, continuing: {:?}", e);
+            }
+        }
+    }
 
     if bytes_to_write.is_empty() {
         error!("No image data to write. This is probably a bug!");

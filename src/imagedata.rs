@@ -3,6 +3,7 @@
 use std::{fmt::Display, io::Cursor, path::PathBuf, str::FromStr};
 
 use image::DynamicImage;
+use image_compare::{Algorithm, rgb_similarity_structure};
 use libheif_rs::{Channel, CompressionFormat, EncoderQuality, HeifContext, LibHeif};
 use log::{debug, error};
 use rayon::iter::IntoParallelIterator;
@@ -13,6 +14,12 @@ use crate::{Error, ImageFormat};
 pub struct Geometry {
     pub width: Option<u32>,
     pub height: Option<u32>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct QualityScore {
+    pub ssim: Option<f64>,
+    pub psnr: Option<f64>,
 }
 
 impl Geometry {
@@ -99,6 +106,7 @@ pub struct Image {
     pub original_geometry: Geometry,
     pub target_geometry: Option<Geometry>,
     pub output_format: Option<crate::ImageFormat>,
+    pub output_suffix: Option<String>,
     pub image: image::DynamicImage,
 }
 
@@ -116,6 +124,7 @@ impl TryFrom<&PathBuf> for Image {
             input_filename: path.clone(),
             target_geometry: None,
             output_format: None,
+            output_suffix: None,
             image,
             original_file_size: original_size,
             original_geometry,
@@ -131,6 +140,11 @@ impl Image {
 
     pub fn with_output_format(mut self, output_format: crate::ImageFormat) -> Self {
         self.output_format = Some(output_format);
+        self
+    }
+
+    pub fn with_output_suffix(mut self, output_suffix: Option<String>) -> Self {
+        self.output_suffix = output_suffix;
         self
     }
 
@@ -315,7 +329,89 @@ impl Image {
             output_path.set_extension("jpg");
         }
 
+        if let Some(ref suffix) = self.output_suffix {
+            if let Some(stem) = output_path.file_stem() {
+                let mut stem = stem.to_os_string();
+                stem.push(suffix);
+
+                if let Some(ext) = output_path.extension() {
+                    stem.push(".");
+                    stem.push(ext);
+                }
+                output_path.set_file_name(stem);
+            }
+        }
+
         output_path
+    }
+
+    pub fn compare_to_encoded(
+        &self,
+        encoded: &[u8],
+        compute_ssim: bool,
+        compute_psnr: bool,
+    ) -> Result<QualityScore, Error> {
+        let source = self.resize()?;
+        let source_rgb = source.to_rgb8();
+        libheif_rs::integration::image::register_all_decoding_hooks();
+        let candidate = image::load_from_memory(encoded).map_err(|e| {
+            Error::ImageComparisonError(format!("Failed to decode encoded output: {e}"))
+        })?;
+        let candidate_rgb = candidate.to_rgb8();
+
+        if candidate_rgb.width() != source_rgb.width()
+            || candidate_rgb.height() != source_rgb.height()
+        {
+            return Err(Error::ImageComparisonError(
+                "Encoded output dimensions do not match source dimensions".to_string(),
+            ));
+        }
+        if candidate_rgb.len() != source_rgb.len() {
+            return Err(Error::ImageComparisonError(
+                "Encoded output channel count does not match source channel count".to_string(),
+            ));
+        }
+
+        let mut score = QualityScore::default();
+
+        if compute_ssim {
+            let ssim_result =
+                rgb_similarity_structure(&Algorithm::MSSIMSimple, &source_rgb, &candidate_rgb)
+                    .map_err(|e| {
+                        Error::ImageComparisonError(format!("Failed to compare SSIM: {e}"))
+                    })?;
+            score.ssim = Some(ssim_result.score);
+        }
+
+        if compute_psnr {
+            score.psnr = Some(Self::compute_psnr(
+                source_rgb.as_raw(),
+                candidate_rgb.as_raw(),
+            ));
+        }
+
+        Ok(score)
+    }
+
+    fn compute_psnr(reference: &[u8], candidate: &[u8]) -> f64 {
+        let mut mse = 0f64;
+        for (reference_channel, candidate_channel) in reference.iter().zip(candidate.iter()) {
+            let difference = *reference_channel as f64 - *candidate_channel as f64;
+            mse += difference * difference;
+        }
+
+        if reference.is_empty() {
+            return f64::INFINITY;
+        }
+
+        mse /= reference.len() as f64;
+
+        if mse == 0.0 {
+            return f64::INFINITY;
+        }
+
+        let max_i = 255f64;
+        20.0 * max_i.log10() - 10.0 * mse.log10()
     }
 
     pub fn auto_format(&self) -> Result<(ImageFormat, Vec<u8>), Error> {

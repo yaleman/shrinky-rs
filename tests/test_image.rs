@@ -4,6 +4,10 @@ use shrinky_rs::{
     cli::test_setup_logging,
     imagedata::{Geometry, Image},
 };
+use std::io::Cursor;
+use std::path::PathBuf;
+
+use clap::Parser;
 
 const IMAGE_NAME: &str = "bruny-oysters";
 const JPG_EXPECTED_WIDTH: u32 = 1330;
@@ -194,6 +198,7 @@ fn test_output_filename_never_jpeg() {
         original_geometry: Geometry::new(1, 1),
         target_geometry: None,
         output_format: None,
+        output_suffix: None,
         image: image::DynamicImage::new_rgba8(1, 1),
     };
 
@@ -212,5 +217,147 @@ fn test_output_filename_never_jpeg() {
         image_with_output.output_filename(),
         std::path::PathBuf::from("tests/test_images/sample.jpg"),
         "Output filename should use .jpg for JPG output"
+    );
+}
+
+#[test]
+fn test_compare_identical_images() {
+    test_setup_logging();
+    let source = image::DynamicImage::ImageRgb8(image::RgbImage::from_fn(16, 16, |x, y| {
+        let base = x.saturating_add(y) as u8;
+        image::Rgb([base, 255 - base, base / 2])
+    }));
+    let image = Image {
+        original_file_size: 0,
+        input_filename: PathBuf::from("tests/test_images/source-compare.jpg"),
+        original_geometry: Geometry::new(16, 16),
+        target_geometry: None,
+        output_format: Some(ImageFormat::Jpg),
+        output_suffix: None,
+        image: source.clone(),
+    };
+
+    let mut encoded = Vec::new();
+    source
+        .write_to(&mut Cursor::new(&mut encoded), image::ImageFormat::Png)
+        .expect("failed to encode source");
+
+    let score = image
+        .compare_to_encoded(&encoded, true, true)
+        .expect("compare failed");
+
+    assert!(
+        (score.ssim.unwrap_or_default() - 1.0).abs() < 0.000_001,
+        "expected identical SSIM score"
+    );
+    assert!(
+        score.psnr.unwrap_or_default().is_infinite(),
+        "expected infinite PSNR for identical images"
+    );
+}
+
+#[test]
+fn test_compare_degraded_image() {
+    test_setup_logging();
+    let source = image::DynamicImage::ImageRgb8(image::RgbImage::from_fn(16, 16, |x, y| {
+        let base = x.saturating_add(y) as u8;
+        image::Rgb([base, 255 - base, base / 2])
+    }));
+    let image = Image {
+        original_file_size: 0,
+        input_filename: PathBuf::from("tests/test_images/source-compare.jpg"),
+        original_geometry: Geometry::new(16, 16),
+        target_geometry: None,
+        output_format: Some(ImageFormat::Jpg),
+        output_suffix: None,
+        image: source.clone(),
+    };
+
+    let mut degraded = source.clone().to_rgb8();
+    let pixel = degraded.get_pixel_mut(1, 1);
+    *pixel = image::Rgb([0, 255, 128]);
+
+    let mut encoded = Vec::new();
+    image::DynamicImage::ImageRgb8(degraded)
+        .write_to(&mut Cursor::new(&mut encoded), image::ImageFormat::Png)
+        .expect("failed to encode degraded image");
+
+    let score = image
+        .compare_to_encoded(&encoded, true, true)
+        .expect("compare failed");
+
+    assert!(score.ssim.unwrap_or(1.0) < 1.0);
+    assert!(score.psnr.unwrap_or(f64::INFINITY).is_finite());
+}
+
+#[test]
+fn test_compare_dimension_mismatch() {
+    test_setup_logging();
+    let source = image::DynamicImage::ImageRgb8(image::RgbImage::from_fn(16, 16, |x, y| {
+        let base = x.saturating_add(y) as u8;
+        image::Rgb([base, 255 - base, base / 2])
+    }));
+    let image = Image {
+        original_file_size: 0,
+        input_filename: PathBuf::from("tests/test_images/source-compare.jpg"),
+        original_geometry: Geometry::new(16, 16),
+        target_geometry: None,
+        output_format: Some(ImageFormat::Png),
+        output_suffix: None,
+        image: source,
+    };
+
+    let mut encoded = Vec::new();
+    image::DynamicImage::ImageRgb8(image::RgbImage::new(8, 8))
+        .write_to(&mut Cursor::new(&mut encoded), image::ImageFormat::Png)
+        .expect("failed to encode resized image");
+
+    let score = image.compare_to_encoded(&encoded, true, true);
+    assert!(score.is_err());
+}
+
+#[test]
+fn test_cli_compare_flags() {
+    use shrinky_rs::cli::Cli;
+
+    let cli = Cli::parse_from([
+        "shrinky-rs",
+        "--compare",
+        "--min-ssim",
+        "0.9",
+        "--min-psnr",
+        "30",
+        "--output-suffix",
+        "-foo",
+        "tests/test_images/bruny-oysters.jpg",
+    ]);
+
+    assert!(cli.compare);
+    assert_eq!(cli.min_ssim, Some(0.9));
+    assert_eq!(cli.min_psnr, Some(30.0));
+    assert_eq!(cli.output_suffix, Some("-foo".to_string()));
+    assert_eq!(
+        cli.filename,
+        PathBuf::from("tests/test_images/bruny-oysters.jpg")
+    );
+}
+
+#[test]
+fn test_output_filename_with_suffix() {
+    test_setup_logging();
+    let image = Image {
+        original_file_size: 0,
+        input_filename: std::path::PathBuf::from("tests/test_images/example.gif"),
+        original_geometry: Geometry::new(1, 1),
+        target_geometry: None,
+        output_format: Some(ImageFormat::Jpg),
+        output_suffix: Some("-foo".to_string()),
+        image: image::DynamicImage::new_rgba8(1, 1),
+    };
+
+    assert_eq!(
+        image.output_filename(),
+        std::path::PathBuf::from("tests/test_images/example-foo.jpg"),
+        "Output filename should include suffix before extension"
     );
 }

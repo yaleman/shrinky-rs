@@ -37,6 +37,10 @@ Options:
 - `-g, --geometry <GEOMETRY>` (env `SHRINKY_GEOMETRY`): resize geometry (`800x600`, `800x`, `x600`).
 - `-f, --force` (env `SHRINKY_FORCE`): overwrite existing output files.
 - `-i, --info`: print image info (dimensions and bytes) before processing.
+- `-c, --compare`: compute and print SSIM and PSNR for the selected output.
+- `--output-suffix <SUFFIX>`: append SUFFIX to the output basename before extension (for example `example.jpg` -> `example-small.jpg` when using `--output-suffix -small`).
+- `--min-ssim <SSIM>`: require a minimum SSIM score when set.
+- `--min-psnr <PSNR>`: require a minimum PSNR score when set.
 
 Examples:
 
@@ -52,12 +56,35 @@ Examples:
   - `cargo run -- --force path/to/image.jpg`
 - Prompt to delete the original after conversion:
   - `cargo run -- --delete path/to/image.png`
+- Add a suffix to generated output filenames:
+  - `cargo run -- --output-suffix -small path/to/image.jpg`
+- Compare perceptual quality for selected output (SSIM + PSNR):
+  - `cargo run -- --compare path/to/image.jpg`
+- Enforce a quality floor with auto-selection:
+  - `cargo run -- --compare --min-ssim 0.96 --min-psnr 30 path/to/image.png`
+
+Example output with `--compare`:
+
+```text
+Perceptual comparison:
+  SSIM: 0.992314
+  PSNR: 41.22 dB
+```
+
+Example failure output when a threshold is not met:
+
+```text
+Perceptual quality gate failed: PSNR 28.41 dB is below minimum 30
+```
 
 ## Notes
 
 - The output filename is always the input filename with the extension replaced by the selected format. There is no output directory option yet.
+- The output filename can include an optional suffix with `--output-suffix`, appended before the extension.
 - When `--type` is not specified, the tool encodes all formats in parallel and keeps the smallest result.
 - `--info` prints dimensions and file size but does not currently stop further processing.
+- `--compare` prints perceptual scores for the selected output in all modes.
+- `--min-ssim` and `--min-psnr` are optional quality gates; when provided, exits non-zero if the comparison score falls below the threshold.
 - AVIF is treated as a non-native format and is routed through the same libheif HEVC encoder used for HEIC/HEIF. This means AVIF output is not AV1-encoded at the moment.
 
 ## Development Notes

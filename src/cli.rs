@@ -17,6 +17,10 @@ pub struct Cli {
     #[arg(short, long, default_value = "false", env = "SHRINKY_DELETE")]
     pub delete: bool,
 
+    /// Add a suffix to the output filename before the extension
+    #[arg(long, env = "SHRINKY_OUTPUT_SUFFIX", allow_hyphen_values = true)]
+    pub output_suffix: Option<String>,
+
     /// Geometry options, eg. 800x, x800, 800x600
     #[arg(short, long, env = "SHRINKY_GEOMETRY")]
     pub geometry: Option<String>,
@@ -27,6 +31,18 @@ pub struct Cli {
     /// Overwrite existing files without prompting
     #[arg(short, long, default_value = "false", env = "SHRINKY_FORCE")]
     pub force: bool,
+
+    /// Compare source and compressed image quality
+    #[arg(short = 'c', long, default_value = "false", env = "SHRINKY_COMPARE")]
+    pub compare: bool,
+
+    /// Minimum SSIM score required when comparison is enabled or a minimum is provided
+    #[arg(long, env = "SHRINKY_MIN_SSIM")]
+    pub min_ssim: Option<f64>,
+
+    /// Minimum PSNR score required when comparison is enabled or a minimum is provided
+    #[arg(long, env = "SHRINKY_MIN_PSNR")]
+    pub min_psnr: Option<f64>,
 
     /// Show image info and return
     #[arg(short, long, default_value = "false")]
