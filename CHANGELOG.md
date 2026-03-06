@@ -14,3 +14,7 @@ Initial release
 - Update final output to show original size, new size, and percent of original.
 - Adding `--info` which shows information of file.
 - Fixes overwrite checks
+
+## 0.0.4
+
+- PSNR and SSMI calculations
