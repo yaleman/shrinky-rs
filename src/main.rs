@@ -1,6 +1,8 @@
 use clap::Parser;
 use log::{debug, error, info, warn};
 use shrinky_rs::{
+    SsimQuality,
+    PsnrQuality,
     ImageFormat,
     cli::Cli,
     imagedata::{Geometry, Image},
@@ -204,13 +206,23 @@ fn main() -> ExitCode {
             Ok(score) => {
                 info!("Perceptual comparison:");
                 if let Some(ssim_score) = score.ssim {
-                    info!("  SSIM: {:.6}", ssim_score);
+                    let quality = SsimQuality::from_ssim(ssim_score)
+                        .map(|q| q.meaning())
+                        .unwrap_or("unmeasurable");
+                    info!("  SSIM: {:.6} ({})", ssim_score, quality);
                 }
                 if let Some(psnr_score) = score.psnr {
                     if psnr_score.is_infinite() {
-                        info!("  PSNR: inf dB");
+                        if let Some(quality) = PsnrQuality::from_psnr(psnr_score) {
+                            info!("  PSNR: inf dB ({})", quality.meaning());
+                        } else {
+                            info!("  PSNR: inf dB");
+                        }
                     } else {
-                        info!("  PSNR: {:.2} dB", psnr_score);
+                        let quality = PsnrQuality::from_psnr(psnr_score)
+                            .map(|q| q.meaning())
+                            .unwrap_or("pretty ugly");
+                        info!("  PSNR: {:.2} dB ({})", psnr_score, quality);
                     }
                 }
 

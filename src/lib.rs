@@ -77,6 +77,82 @@ impl ImageFormat {
     }
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum PsnrQuality {
+    PrettyUgly,
+    VisibleDegradation,
+    GoodCompression,
+    ExtremelyHighQuality,
+    AlmostIdentical,
+}
+
+impl PsnrQuality {
+    pub fn from_psnr(psnr: f64) -> Option<Self> {
+        if psnr.is_nan() {
+            return None;
+        }
+
+        if psnr >= 50.0 {
+            Some(Self::AlmostIdentical)
+        } else if psnr >= 40.0 {
+            Some(Self::ExtremelyHighQuality)
+        } else if psnr >= 30.0 {
+            Some(Self::GoodCompression)
+        } else if psnr >= 20.0 {
+            Some(Self::VisibleDegradation)
+        } else {
+            Some(Self::PrettyUgly)
+        }
+    }
+
+    pub const fn meaning(self) -> &'static str {
+        match self {
+            Self::AlmostIdentical => "almost identical",
+            Self::ExtremelyHighQuality => "extremely high quality",
+            Self::GoodCompression => "good compression",
+            Self::VisibleDegradation => "visible degradation",
+            Self::PrettyUgly => "pretty ugly",
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum SsimQuality {
+    NoticeableDegradation,
+    SmallVisibleDifferences,
+    ExtremelySimilar,
+    Identical,
+}
+
+impl SsimQuality {
+    pub fn from_ssim(ssim: f64) -> Option<Self> {
+        if ssim.is_nan() {
+            return None;
+        }
+
+        if ssim >= 1.0 {
+            Some(Self::Identical)
+        } else if ssim >= 0.9 {
+            Some(Self::ExtremelySimilar)
+        } else if ssim >= 0.8 {
+            Some(Self::SmallVisibleDifferences)
+        } else if ssim >= 0.7 {
+            Some(Self::SmallVisibleDifferences)
+        } else {
+            Some(Self::NoticeableDegradation)
+        }
+    }
+
+    pub const fn meaning(self) -> &'static str {
+        match self {
+            Self::Identical => "identical images",
+            Self::ExtremelySimilar => "extremely similar",
+            Self::SmallVisibleDifferences => "small visible differences",
+            Self::NoticeableDegradation => "noticeable degradation",
+        }
+    }
+}
+
 impl FromStr for ImageFormat {
     type Err = Error;
 

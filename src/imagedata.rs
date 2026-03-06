@@ -329,17 +329,17 @@ impl Image {
             output_path.set_extension("jpg");
         }
 
-        if let Some(ref suffix) = self.output_suffix {
-            if let Some(stem) = output_path.file_stem() {
-                let mut stem = stem.to_os_string();
-                stem.push(suffix);
+        if let Some(ref suffix) = self.output_suffix
+            && let Some(stem) = output_path.file_stem()
+        {
+            let mut stem = stem.to_os_string();
+            stem.push(suffix);
 
-                if let Some(ext) = output_path.extension() {
-                    stem.push(".");
-                    stem.push(ext);
-                }
-                output_path.set_file_name(stem);
+            if let Some(ext) = output_path.extension() {
+                stem.push(".");
+                stem.push(ext);
             }
+            output_path.set_file_name(stem);
         }
 
         output_path
