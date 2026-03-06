@@ -1,0 +1,15 @@
+# run the linter, tests, and format the code
+[tasks.check]
+depends = ["clippy", "test", "fmt"]
+
+# run clippy
+[tasks.clippy]
+run = "cargo clippy --all-targets --quiet --workspace"
+
+# run rust tests
+[tasks.test]
+run = "cargo test --quiet --workspace"
+
+# format the rust code
+[tasks.fmt]
+run = "cargo fmt --all"
