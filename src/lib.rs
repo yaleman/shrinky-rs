@@ -134,8 +134,8 @@ impl SsimQuality {
             Some(Self::Identical)
         } else if ssim >= 0.9 {
             Some(Self::ExtremelySimilar)
-        } else if ssim >= 0.8 {
-            Some(Self::SmallVisibleDifferences)
+        // } else if ssim >= 0.8 {
+        //     Some(Self::SmallVisibleDifferences)
         } else if ssim >= 0.7 {
             Some(Self::SmallVisibleDifferences)
         } else {
