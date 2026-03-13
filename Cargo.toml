@@ -8,7 +8,7 @@ description = "Rusty image converter and compressor"
 license = "MIT"
 
 [dependencies]
-clap = { version = "4.5.60", features = ["derive", "env"] }
+clap = { version = "4.6.0", features = ["derive", "env"] }
 image = { version = "0.25.9", features = ["rayon", "avif-native"] }
 image-compare = "0.5.0"
 libheif-rs = { version = "2.7.0", features = ["image"] }
