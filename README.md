@@ -1,6 +1,6 @@
 # shrinky-rs
 
-shrinky-rs is a Rust reimplementation of the Python "shrinky" tool. It is a CLI that loads a single image, optionally resizes it, and then converts it to the smallest output among supported formats (or a user-selected format).
+shrinky-rs is a Rust reimplementation of the Python "shrinky" tool. It is a CLI that loads one or more images, optionally resizes them, and then converts each image to the smallest output among supported formats (or a user-selected format).
 
 ## Features
 
@@ -26,7 +26,7 @@ shrinky-rs is a Rust reimplementation of the Python "shrinky" tool. It is a CLI 
 ## Usage
 
 ```
-shrinky-rs [OPTIONS] <FILENAME>
+shrinky-rs [OPTIONS] <FILENAME>...
 ```
 
 Options:
@@ -44,8 +44,10 @@ Options:
 
 Examples:
 
-- Auto-optimize an image:
+- Auto-optimize one image:
   - `cargo run -- path/to/image.jpg`
+- Auto-optimize multiple images in one run:
+  - `cargo run -- path/to/one.jpg path/to/two.png`
 - Convert to WebP:
   - `cargo run -- --type webp path/to/image.png`
 - Resize to width 800, preserve aspect ratio:
@@ -79,7 +81,7 @@ Perceptual quality gate failed: PSNR 28.41 dB is below minimum 30
 
 ## Notes
 
-- The output filename is always the input filename with the extension replaced by the selected format. There is no output directory option yet.
+- Each output filename is always the corresponding input filename with the extension replaced by the selected format. There is no output directory option yet.
 - The output filename can include an optional suffix with `--output-suffix`, appended before the extension.
 - When `--type` is not specified, the tool encodes all formats in parallel and keeps the smallest result.
 - `--info` prints dimensions and file size but does not currently stop further processing.

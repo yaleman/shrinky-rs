@@ -25,8 +25,9 @@ pub struct Cli {
     #[arg(short, long, env = "SHRINKY_GEOMETRY")]
     pub geometry: Option<String>,
 
-    /// input filename
-    pub filename: PathBuf,
+    /// one or more input filenames
+    #[arg(required = true, num_args = 1..)]
+    pub filenames: Vec<PathBuf>,
 
     /// Overwrite existing files without prompting
     #[arg(short, long, default_value = "false", env = "SHRINKY_FORCE")]

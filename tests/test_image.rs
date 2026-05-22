@@ -337,8 +337,27 @@ fn test_cli_compare_flags() {
     assert_eq!(cli.min_psnr, Some(30.0));
     assert_eq!(cli.output_suffix, Some("-foo".to_string()));
     assert_eq!(
-        cli.filename,
-        PathBuf::from("tests/test_images/bruny-oysters.jpg")
+        cli.filenames,
+        vec![PathBuf::from("tests/test_images/bruny-oysters.jpg")]
+    );
+}
+
+#[test]
+fn test_cli_multiple_filenames() {
+    use shrinky_rs::cli::Cli;
+
+    let cli = Cli::parse_from([
+        "shrinky-rs",
+        "tests/test_images/bruny-oysters.jpg",
+        "tests/test_images/bruny-oysters.png",
+    ]);
+
+    assert_eq!(
+        cli.filenames,
+        vec![
+            PathBuf::from("tests/test_images/bruny-oysters.jpg"),
+            PathBuf::from("tests/test_images/bruny-oysters.png"),
+        ]
     );
 }
 
