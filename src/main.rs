@@ -1,9 +1,7 @@
 use clap::Parser;
 use log::{debug, error, info, warn};
 use shrinky_rs::{
-    SsimQuality,
-    PsnrQuality,
-    ImageFormat,
+    ImageFormat, PsnrQuality, SsimQuality,
     cli::Cli,
     imagedata::{Geometry, Image},
 };
@@ -98,60 +96,55 @@ pub fn setup_logging(debug: bool) {
     }
 }
 
-fn main() -> ExitCode {
-    let cli = Cli::parse();
-    setup_logging(cli.debug);
+fn aggregate_exit_code(current: u8, next: u8) -> u8 {
+    max(current, next)
+}
 
-    if !cli.filename.exists() {
-        error!("File not found: {}", cli.filename.display());
-        return ExitCode::FAILURE;
+fn process_image(cli: &Cli, target_geometry: Option<&Geometry>, input_path: &Path) -> u8 {
+    if !input_path.exists() {
+        error!("File not found: {}", input_path.display());
+        return 1;
     }
-    if !cli.filename.is_file() {
-        error!("Not a file: {}", cli.filename.display());
-        return ExitCode::FAILURE;
+    if !input_path.is_file() {
+        error!("Not a file: {}", input_path.display());
+        return 1;
     }
 
-    debug!("Processing image: {}", cli.filename.display());
-    let mut image = match Image::try_from(&cli.filename) {
+    debug!("Processing image: {}", input_path.display());
+    let input_filename = input_path.to_path_buf();
+    let mut image = match Image::try_from(&input_filename) {
         Ok(img) => img,
         Err(e) => {
-            error!("Error loading image: {:?}", e);
-            return ExitCode::FAILURE;
+            error!("Error loading image {}: {:?}", input_path.display(), e);
+            return 1;
         }
     };
     image = image.with_output_suffix(cli.output_suffix.clone());
     if cli.info {
         info!(
-            "Dimensions: {}x{} Size: {} bytes",
+            "{}: Dimensions: {}x{} Size: {} bytes",
+            input_path.display(),
             image.image.width(),
             image.image.height(),
             format_bytes(image.original_file_size)
         );
     }
 
-    if let Some(target_geometry) = cli.geometry {
-        let target_geometry = match Geometry::from_str(target_geometry.as_str()) {
-            Ok(geom) => geom,
-            Err(e) => {
-                error!("Error parsing geometry: {:?}", e);
-                return ExitCode::FAILURE;
-            }
-        };
-        if !target_geometry.is_empty() {
-            image = image.with_target_geometry(target_geometry);
+    if let Some(target_geometry) = target_geometry {
+        image = image.with_target_geometry(target_geometry.clone());
 
-            match image.resize() {
-                Ok(new_image) => {
-                    debug!(
-                        "Resized image to {}x{}",
-                        new_image.width(),
-                        new_image.height()
-                    );
-                }
-                Err(e) => {
-                    error!("Error resizing image: {:?}", e);
-                    return ExitCode::FAILURE;
-                }
+        match image.resize() {
+            Ok(new_image) => {
+                debug!(
+                    "{}: Resized image to {}x{}",
+                    input_path.display(),
+                    new_image.width(),
+                    new_image.height()
+                );
+            }
+            Err(e) => {
+                error!("Error resizing image {}: {:?}", input_path.display(), e);
+                return 1;
             }
         }
     }
@@ -159,33 +152,43 @@ fn main() -> ExitCode {
     let bytes_to_write = match cli.output_type {
         None => match image.auto_format() {
             Ok((format, data)) => {
-                debug!("Auto-optimized image to format {}", format,);
+                debug!(
+                    "{}: Auto-optimized image to format {}",
+                    input_path.display(),
+                    format,
+                );
                 if data.len() > image.original_file_size as usize {
                     let original_size = image.original_file_size as usize;
                     let increase = data.len() - original_size;
                     let pct_change = (data.len() as f64 / max(original_size, 1) as f64) * 100.0;
                     error!(
-                        "Auto-mode output would be larger; skipping write (format {}, {} -> {} bytes, +{}, {:.1}%)",
+                        "{}: Auto-mode output would be larger; skipping write (format {}, {} -> {} bytes, +{}, {:.1}%)",
+                        input_path.display(),
                         format,
                         format_bytes(original_size as u64),
                         format_bytes(data.len() as u64),
                         format_bytes(increase as u64),
                         pct_change
                     );
-                    return ExitCode::from(2);
+                    return 2;
                 }
                 image.output_format = Some(format);
                 data
             }
             Err(e) => {
-                error!("Error auto-optimizing image: {:?}", e);
-                return ExitCode::FAILURE;
+                error!(
+                    "Error auto-optimizing image {}: {:?}",
+                    input_path.display(),
+                    e
+                );
+                return 1;
             }
         },
         Some(format) => match image.output_as_format(format) {
             Ok(data) => {
                 info!(
-                    "Encoded image to format {}, size {} bytes",
+                    "{}: Encoded image to format {}, size {} bytes",
+                    input_path.display(),
                     format,
                     data.len()
                 );
@@ -193,8 +196,13 @@ fn main() -> ExitCode {
                 data
             }
             Err(e) => {
-                error!("Error encoding image as {:?}: {:?}", format, e);
-                return ExitCode::FAILURE;
+                error!(
+                    "Error encoding image {} as {:?}: {:?}",
+                    input_path.display(),
+                    format,
+                    e
+                );
+                return 1;
             }
         },
     };
@@ -204,7 +212,7 @@ fn main() -> ExitCode {
         let compute_psnr = cli.compare || cli.min_psnr.is_some();
         match image.compare_to_encoded(&bytes_to_write, compute_ssim, compute_psnr) {
             Ok(score) => {
-                info!("Perceptual comparison:");
+                info!("{}: Perceptual comparison:", input_path.display());
                 if let Some(ssim_score) = score.ssim {
                     let quality = SsimQuality::from_ssim(ssim_score)
                         .map(|q| q.meaning())
@@ -228,59 +236,81 @@ fn main() -> ExitCode {
 
                 if let Some(min_ssim) = cli.min_ssim {
                     if score.ssim.is_none() {
-                        error!("SSIM score was not computed, cannot enforce --min-ssim");
-                        return ExitCode::from(3);
+                        error!(
+                            "{}: SSIM score was not computed, cannot enforce --min-ssim",
+                            input_path.display()
+                        );
+                        return 3;
                     }
 
                     if let Some(actual_ssim) = score.ssim
                         && actual_ssim < min_ssim
                     {
                         error!(
-                            "Perceptual quality gate failed: SSIM {:.6} is below minimum {}",
-                            actual_ssim, min_ssim
+                            "{}: Perceptual quality gate failed: SSIM {:.6} is below minimum {}",
+                            input_path.display(),
+                            actual_ssim,
+                            min_ssim
                         );
-                        return ExitCode::from(3);
+                        return 3;
                     }
                 }
 
                 if let Some(min_psnr) = cli.min_psnr {
                     if score.psnr.is_none() {
-                        error!("PSNR score was not computed, cannot enforce --min-psnr");
-                        return ExitCode::from(3);
+                        error!(
+                            "{}: PSNR score was not computed, cannot enforce --min-psnr",
+                            input_path.display()
+                        );
+                        return 3;
                     }
 
                     if let Some(actual_psnr) = score.psnr
                         && actual_psnr < min_psnr
                     {
                         error!(
-                            "Perceptual quality gate failed: PSNR {:.2} dB is below minimum {}",
-                            actual_psnr, min_psnr
+                            "{}: Perceptual quality gate failed: PSNR {:.2} dB is below minimum {}",
+                            input_path.display(),
+                            actual_psnr,
+                            min_psnr
                         );
-                        return ExitCode::from(3);
+                        return 3;
                     }
                 }
             }
             Err(e) => {
                 if cli.min_ssim.is_some() || cli.min_psnr.is_some() {
-                    error!("Perceptual comparison failed: {:?}", e);
-                    return ExitCode::from(3);
+                    error!(
+                        "{}: Perceptual comparison failed: {:?}",
+                        input_path.display(),
+                        e
+                    );
+                    return 3;
                 }
-                warn!("Perceptual comparison failed, continuing: {:?}", e);
+                warn!(
+                    "{}: Perceptual comparison failed, continuing: {:?}",
+                    input_path.display(),
+                    e
+                );
             }
         }
     }
 
     if bytes_to_write.is_empty() {
-        error!("No image data to write. This is probably a bug!");
-        return ExitCode::FAILURE;
+        error!(
+            "{}: No image data to write. This is probably a bug!",
+            input_path.display()
+        );
+        return 1;
     }
 
     if image.will_overwrite() && !cli.force {
         error!(
-            "Output file {} already exists. Use --force to overwrite.",
+            "{}: Output file {} already exists. Use --force to overwrite.",
+            input_path.display(),
             image.output_filename().display()
         );
-        return ExitCode::FAILURE;
+        return 1;
     }
 
     match std::fs::write(image.output_filename(), &bytes_to_write) {
@@ -289,7 +319,8 @@ fn main() -> ExitCode {
             let output_size = max(bytes_to_write.len(), 1) as f64;
             let pct_change = output_size / original_size * 100.0;
             info!(
-                "Wrote optimized image to {} ({} -> {} bytes, {:.1}% of original)",
+                "{}: Wrote optimized image to {} ({} -> {} bytes, {:.1}% of original)",
+                input_path.display(),
                 image.output_filename().display(),
                 format_bytes(original_size as u64),
                 format_bytes(output_size as u64),
@@ -298,11 +329,12 @@ fn main() -> ExitCode {
         }
         Err(e) => {
             error!(
-                "Error writing optimized image to {}: {}",
+                "{}: Error writing optimized image to {}: {}",
+                input_path.display(),
                 image.output_filename().display(),
                 e
             );
-            return ExitCode::FAILURE;
+            return 1;
         }
     }
 
@@ -319,8 +351,10 @@ fn main() -> ExitCode {
                         let size_reduced = bytes_to_write.len() < image.original_file_size as usize;
 
                         debug!(
-                            "Delete check: format_changed={}, size_reduced={}",
-                            format_changed, size_reduced
+                            "{}: Delete check: format_changed={}, size_reduced={}",
+                            input_path.display(),
+                            format_changed,
+                            size_reduced
                         );
 
                         // Only prompt if there's a benefit (smaller or different format)
@@ -358,30 +392,92 @@ fn main() -> ExitCode {
                                     }
                                 }
                                 Err(e) => {
-                                    warn!("Error prompting for deletion: {}", e);
+                                    warn!(
+                                        "{}: Error prompting for deletion: {}",
+                                        input_path.display(),
+                                        e
+                                    );
                                 }
                             }
                         } else {
                             debug!(
-                                "No benefit to deleting original file (same format and not smaller)"
+                                "{}: No benefit to deleting original file (same format and not smaller)",
+                                input_path.display()
                             );
                         }
                     } else {
-                        warn!("Output format not set after conversion");
+                        warn!(
+                            "{}: Output format not set after conversion",
+                            input_path.display()
+                        );
                     }
                 }
                 Err(e) => {
                     warn!(
-                        "Could not determine original format for {}: {:?}",
+                        "{}: Could not determine original format for {}: {:?}",
+                        input_path.display(),
                         image.input_filename.display(),
                         e
                     );
                 }
             }
         } else {
-            debug!("Skipping deletion: output overwrote input file");
+            debug!(
+                "{}: Skipping deletion: output overwrote input file",
+                input_path.display()
+            );
         }
     }
 
-    ExitCode::SUCCESS
+    0
+}
+
+fn main() -> ExitCode {
+    let cli = Cli::parse();
+    setup_logging(cli.debug);
+
+    let target_geometry = match cli.geometry.as_deref() {
+        Some(target_geometry) => match Geometry::from_str(target_geometry) {
+            Ok(geometry) if geometry.is_empty() => None,
+            Ok(geometry) => Some(geometry),
+            Err(e) => {
+                error!("Error parsing geometry: {:?}", e);
+                return ExitCode::FAILURE;
+            }
+        },
+        None => None,
+    };
+
+    let mut exit_code = 0;
+    for filename in &cli.filenames {
+        let current_exit_code = process_image(&cli, target_geometry.as_ref(), filename.as_path());
+        exit_code = aggregate_exit_code(exit_code, current_exit_code);
+    }
+
+    ExitCode::from(exit_code)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::aggregate_exit_code;
+
+    #[test]
+    fn test_aggregate_exit_code_all_success() {
+        let mut exit_code = 0;
+        for current_code in [0, 0, 0] {
+            exit_code = aggregate_exit_code(exit_code, current_code);
+        }
+
+        assert_eq!(exit_code, 0);
+    }
+
+    #[test]
+    fn test_aggregate_exit_code_uses_highest_failure() {
+        let mut exit_code = 0;
+        for current_code in [1, 3, 2, 1] {
+            exit_code = aggregate_exit_code(exit_code, current_code);
+        }
+
+        assert_eq!(exit_code, 3);
+    }
 }
