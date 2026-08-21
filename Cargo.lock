@@ -436,7 +436,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3c91aea6668645415331133ed6f8ddf0e7f40160cd97a12d59e68716a58704b"
 dependencies = [
  "libc",
- "system-deps",
+ "system-deps 7.0.7",
 ]
 
 [[package]]
@@ -816,13 +816,13 @@ dependencies = [
 
 [[package]]
 name = "libheif-sys"
-version = "5.3.0+1.23.0"
+version = "5.3.1+1.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d2593dda939875015d3e1a9deccdb57381d4ef1fc9a96120731b25990579689"
+checksum = "f554864c5f34c7f285ff6acdcadb64bcc2a3de1609e9135cec702c5edc703864"
 dependencies = [
  "cfg-if",
  "libc",
- "system-deps",
+ "system-deps 8.0.0",
  "vcpkg",
  "walkdir",
 ]
@@ -1243,9 +1243,9 @@ dependencies = [
 
 [[package]]
 name = "serde_spanned"
-version = "1.0.4"
+version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8bbf91e5a4d6315eee45e704372590b30e260ee83af6639d64557f51b067776"
+checksum = "6662b5879511e06e8999a8a235d848113e942c9124f211511b16466ee2995f26"
 dependencies = [
  "serde_core",
 ]
@@ -1376,7 +1376,20 @@ dependencies = [
  "cfg-expr",
  "heck",
  "pkg-config",
- "toml",
+ "toml 0.9.11+spec-1.1.0",
+ "version-compare",
+]
+
+[[package]]
+name = "system-deps"
+version = "8.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "83779a5c956bcb6ba627a4ecf0a9d7625db47d7537e0892d97f712ac995648a3"
+dependencies = [
+ "cfg-expr",
+ "heck",
+ "pkg-config",
+ "toml 1.1.4+spec-1.1.0",
  "version-compare",
 ]
 
@@ -1460,10 +1473,25 @@ dependencies = [
  "indexmap",
  "serde_core",
  "serde_spanned",
- "toml_datetime",
+ "toml_datetime 0.7.5+spec-1.1.0",
  "toml_parser",
  "toml_writer",
- "winnow",
+ "winnow 0.7.14",
+]
+
+[[package]]
+name = "toml"
+version = "1.1.4+spec-1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3aace63f4bbcdfc2c965b059de67119c89c4017a70d633be6c104910f67056f5"
+dependencies = [
+ "indexmap",
+ "serde_core",
+ "serde_spanned",
+ "toml_datetime 1.1.1+spec-1.1.0",
+ "toml_parser",
+ "toml_writer",
+ "winnow 1.0.4",
 ]
 
 [[package]]
@@ -1476,19 +1504,28 @@ dependencies = [
 ]
 
 [[package]]
-name = "toml_parser"
-version = "1.0.6+spec-1.1.0"
+name = "toml_datetime"
+version = "1.1.1+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a3198b4b0a8e11f09dd03e133c0280504d0801269e9afa46362ffde1cbeebf44"
+checksum = "3165f65f62e28e0115a00b2ebdd37eb6f3b641855f9d636d3cd4103767159ad7"
 dependencies = [
- "winnow",
+ "serde_core",
+]
+
+[[package]]
+name = "toml_parser"
+version = "1.1.3+spec-1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d38ac1cf9b95face32296c0a3ede1fdc270627c9d9c02a7274dd6d960dc4d56"
+dependencies = [
+ "winnow 1.0.4",
 ]
 
 [[package]]
 name = "toml_writer"
-version = "1.0.6+spec-1.1.0"
+version = "1.1.2+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab16f14aed21ee8bfd8ec22513f7287cd4a91aa92e44edfe2c17ddd004e92607"
+checksum = "7d56353a2a665ad0f41a421187180aab746c8c325620617ad883a99a1cbe66d2"
 
 [[package]]
 name = "unicode-ident"
@@ -1683,6 +1720,12 @@ name = "winnow"
 version = "0.7.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5a5364e9d77fcdeeaa6062ced926ee3381faa2ee02d3eb83a5c27a8825540829"
+
+[[package]]
+name = "winnow"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "23b97319f7b8343df12cc98938e5c3eb436064524c8d2b4e30a1d3a36eecdf81"
 
 [[package]]
 name = "wit-bindgen"
